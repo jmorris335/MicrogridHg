@@ -3,8 +3,8 @@
 This package describes the behavior of a microgrid, formalized in a constraint hypergraph.
 
 <h1 align="center">
-<img src="https://github.com/jmorris335/MicrogridHg/blob/4289387eb6b0bc1965528751422b321f03f0e465/media/microgrid.png?raw=true" width="300">
-</h1><br>
+<img src="https://github.com/jmorris335/MicrogridHg/blob/4289387eb6b0bc1965528751422b321f03f0e465/media/microgrid.png?raw=true" width="500">
+</h1>
 
 ## Files:
 - `microgrid.py`: The main model, as well as the caller for the simulation. Described in detail below in [Usage](#usage).
