@@ -17,7 +17,7 @@ This package describes the behavior of a microgrid, formalized in a constraint h
 This package is likely to be released under the MIT license, but for now **all rights are reserved.** Please contact the authors for more information on specific uses.
 
 ## Overview
-The microgrid consists of 12 objects of 5 different types: batteries (2), buildings (5), generators (2), photovoltaic arrays (1), all connected to each other and the greater utility grid along 2 busses. An overview of their connections is given in the [visual plot](https://github.com/jmorris335/MicrogridHg/media/microgrid%20chg.png) of the constraint hypergraph.
+The microgrid consists of 12 objects of 5 different types: batteries (2), buildings (5), generators (2), photovoltaic arrays (1), all connected to each other and the greater utility grid along 2 busses. An overview of their connections is given in the [visual plot](https://github.com/jmorris335/MicrogridHg/blob/main/media/microgrid%20chg.png) of the constraint hypergraph.
 
 ## Structure
 The only package requirements are ConstraintHg, a breadth-first hypergraph solver available [here](https://github.com/jmorris335/ConstraintHg) and on the Python Package Index. Once you've downloaded the repository, you can install the latest version of ConstraintHg by calling 
