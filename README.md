@@ -14,10 +14,10 @@ This package describes the behavior of a microgrid, formalized in a constraint h
 - `media/`: images for the hypergraph that cannot be republished.
 
 ## Usage
-This package is likely to be released under the MIT license, but for now **all rights are reserved.** Please contact the authors for more information on specific uses.
+This package has been released under the MIT license. Though not required by the license, if you do end up using this package or making changes we would love to hear about it! Please reach out via our GitHub profiles.
 
 ## Overview
-The microgrid consists of 12 objects of 5 different types: batteries (2), buildings (5), generators (2), photovoltaic arrays (1), all connected to each other and the greater utility grid along 2 busses. An overview of their connections is given in the [visual plot](https://github.com/jmorris335/MicrogridHg/blob/main/media/microgrid%20chg.png) of the constraint hypergraph.
+The default configuration of the microgrid consists of 12 objects of 5 different types: batteries (2), buildings (5), generators (2), photovoltaic arrays (1), all connected to each other and the greater utility grid along 2 busses. An overview of their connections is given in the [visual plot](https://github.com/jmorris335/MicrogridHg/blob/main/media/microgrid%20chg.png) of the constraint hypergraph.
 
 ## Structure
 The only package requirements are ConstraintHg, a breadth-first hypergraph solver available [here](https://github.com/jmorris335/ConstraintHg) and on the Python Package Index. Once you've downloaded the repository, you can install the latest version of ConstraintHg by calling 
