@@ -1,5 +1,6 @@
 All rights reserved. For usage information please contact the authors:
 - John Morris, jhmrrs@clemson.edu, ORCID: 0009-0005-6571-1959
 - Douglas L. Van Bossuyt
+- Edward Louis
 - Gregory Mocko
 - John Wagner
