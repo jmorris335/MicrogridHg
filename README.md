@@ -2,7 +2,11 @@
 
 This package describes the behavior of a microgrid, formalized in a constraint hypergraph.
 
-Files:
+<h1 align="center">
+<img src="https://github.com/jmorris335/MicrogridHg/blob/4289387eb6b0bc1965528751422b321f03f0e465/media/microgrid.png?raw=true" width="300">
+</h1><br>
+
+## Files:
 - `microgrid.py`: The main model, as well as the caller for the simulation. Described in detail below in [Usage](#usage).
 - `microgrid_objects.py`: Class definitions for the grid objects used on the grid.
 - `building_data/`: directory of CSV files specifying loads for various buildings used on the grid.
@@ -13,10 +17,14 @@ Files:
 This package is likely to be released under the MIT license, but for now **all rights are reserved.** Please contact the authors for more information on specific uses.
 
 ## Overview
-The microgrid consists of 12 objects of 5 different types: batteries (2), buildings (5), generators (2), photovoltaic arrays (1), all connected to each other and the greater utility grid along 2 busses. An overview of their connections is given in the [constrainthg picture].
+The microgrid consists of 12 objects of 5 different types: batteries (2), buildings (5), generators (2), photovoltaic arrays (1), all connected to each other and the greater utility grid along 2 busses. An overview of their connections is given in the [visual plot](https://github.com/jmorris335/MicrogridHg/media/microgrid%20chg.png) of the constraint hypergraph.
 
 ## Structure
-The only package requirements are ConstraintHg, a breadth-first hypergraph solver available [here](https://github.com/jmorris335/ConstraintHg) and on the Python Package Index. Once you've downloaded the repository, you can install the latest version of ConstraintHg by calling `pip install constrainthg`. 
+The only package requirements are ConstraintHg, a breadth-first hypergraph solver available [here](https://github.com/jmorris335/ConstraintHg) and on the Python Package Index. Once you've downloaded the repository, you can install the latest version of ConstraintHg by calling 
+
+```
+pip install constrainthg
+```
 
 The model is used by executing the main script: `microgrid.py`. The structure of the program is:
 
