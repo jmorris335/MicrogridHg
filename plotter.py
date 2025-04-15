@@ -1,10 +1,28 @@
 """Helper class for plotting."""
 import matplotlib.pyplot as plt
-import constrainthg
+import constrainthg as chg
 
 plt.rcParams['font.family'] = 'times'
 
-def plotTimeValues(labels: list, found_values: dict, time_step: float, 
+def solve_and_plot(hg: chg.Hypergraph, nodes: list, inputs: dict, indices: list=None):
+    """Solves the graph for each of the nodes (at the given indices) and plots the results."""
+    found_values = {}
+    if indices is None:
+        indices = [1 for n in nodes]
+    else:
+        indices = [1 if i is None else i for i in indices]
+
+    for node, index in zip(nodes, indices):
+        if len(found_values.get(node.label, [])) >= index:
+            continue
+        t = hg.solve(node, inputs, min_index=index, to_print=False, search_depth=5000)
+        if t is not None:
+            found_values = found_values | t.found_values_new
+
+        labels = [n.label for n in nodes if n.label in found_values]
+        plot_time_values(labels, found_values, 'elapsed hour')
+
+def plot_time_values(labels: list, found_values: dict, time_step: float, 
                    title: str='Simulation'):
     """Plots the values in the dictionary as a function of time.
     
@@ -26,7 +44,7 @@ def plotTimeValues(labels: list, found_values: dict, time_step: float,
         times = found_values[time_step]
     for label in labels:
         dash = dashes[labels.index(label) % len(dashes)]
-        if isinstance(label, constrainthg.Node):
+        if isinstance(label, chg.Node):
             legend_label = label.label + f', ({label.units})' if label.units is not None else ''
             label = label.label
         else:
@@ -34,7 +52,8 @@ def plotTimeValues(labels: list, found_values: dict, time_step: float,
         values = found_values[label]
         if not isinstance(time_step, str):
             times = [time_step * i for i in range(len(values))]
-        plt.plot(times[:len(values)], values[:len(times)], 'k', lw=2, linestyle=dash) 
+        # plt.plot(times[:len(values)], values[:len(times)], 'k', lw=2, linestyle=dash) 
+        plt.plot(times[:len(values)], values[:len(times)], lw=2) 
         legend.append(legend_label)
     plt.legend(legend)
     plt.ylabel('Variables')
