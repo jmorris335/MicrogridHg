@@ -17,14 +17,17 @@ class GridObject:
                                  description='more power is being demanded of an object than can be supplied')
         self.is_load_shedding = Node(f'{name} is load shedding', kwargs.get('is_load_shedding', False),
                                 description='true if the object is deliberately disconnected from the grid')
-        self.demand = Node(f'demand_{name}', kwargs.get('demand', None), description='load of object demanded from grid (W)')
-        self.state = Node(f'state_{name}', kwargs.get('state', None), description='amount of power actively receiving (-) or providing (+) (W)')
+        self.demand = Node(f'demand_{name}', kwargs.get('demand', None), description='load of object demanded from grid', units='W')
+        self.state = Node(f'state_{name}', kwargs.get('state', None), description='amount of power actively receiving (-) or providing (+)', units='W')
         self.receives_from = {name: Node(f'{name} receives from itself', True, description=f'{name} receives power from itself (trivial)')}
         for source, val in dict(kwargs.get('receives_from', {})).items():
             self.add_source(source, val)
         self.receiving_from = {}
         for source, val in dict(kwargs.get('receiving_from', {})).items():
             self.add_active_source(source, val)
+        demand = kwargs.get('demand', None) 
+        self.demand_pair = Node(f'demand_pair_{name}', (name, demand) if demand is not None else None, 
+                                    description='keyed connection to demand')
     
     def add_source(self, source, val: bool=True):
         """Creates a node indicating that the source GridObject is wired to provide power to this GridObject."""
@@ -44,11 +47,11 @@ class Generator(GridObject):
     """A grid object that can only supply power converted from some type of fuel."""
     def __init__(self, name: str, fuel_capacity: float, starting_fuel_level: float, max_output: float, 
                  efficiency: float, **kwargs):
-        self.fuel_capacity = Node(f'fuel_capacity_{name}', fuel_capacity, description='max amount of fuel in generator (Gal)')
-        self.starting_fuel_level = Node(f'starting_fuel_level_{name}', starting_fuel_level, description='starting fuel level in generator (Gal)')
-        self.max_output = Node(f'max_output_{name}', max_output, description='max charge generator can output (kW)')
-        self.efficiency = Node(f'efficiency_{name}', efficiency, description='efficiency for generator (Gph/kW)')
-        self.fuel_level = Node(f'fuel_level_{name}', kwargs.get('fuel_level', None), description='amount of fuel in generator (Gal)')
+        self.fuel_capacity = Node(f'fuel_capacity_{name}', fuel_capacity, description='max amount of fuel in generator', units='Gal')
+        self.starting_fuel_level = Node(f'starting_fuel_level_{name}', starting_fuel_level, description='starting fuel level in generator', units='Gal')
+        self.max_output = Node(f'max_output_{name}', max_output, description='max charge generator can output', units='W')
+        self.efficiency = Node(f'efficiency_{name}', efficiency, description='efficiency for generator', units='Gph/W')
+        self.fuel_level = Node(f'fuel_level_{name}', kwargs.get('fuel_level', None), description='amount of fuel in generator', units='Gal')
         self.out_of_fuel = Node(f'out_of_fuel_{name}', kwargs.get('out_of_fuel', None), description='generator is out of fuel')
         super().__init__(name, demand=0., **kwargs)
     
@@ -59,9 +62,9 @@ class Battery(GridObject):
         self.charge_level = Node(f'charge_level_{name}', charge_level, description='amount of charge in battery')
         self.charge_capacity = Node(f'charge_capacity_{name}', charge_capacity, description='max amount of charge in battery')
         self.wasted_charge = Node(f'wasted_charge_{name}', 0., description='charge wasted in battery')
-        self.max_output = Node(f'max_output_{name}', max_output, description='max charge battery can output (kW)')
+        self.max_output = Node(f'max_output_{name}', max_output, description='max charge battery can output', units='W')
         self.efficiency = Node(f'efficiency_{name}', efficiency, description='efficiency of battery')
-        self.max_charge_rate = Node(f'max_charge_rate_{name}', max_charge_rate, description='max charge rate for battery (kW/hr)')
+        self.max_charge_rate = Node(f'max_charge_rate_{name}', max_charge_rate, description='max charge rate for battery', units='W/hr')
         self.is_charging = Node(f'{name} is charging', description='true if battery is set for charging')
         super().__init__(name, demand=0., **kwargs)
 

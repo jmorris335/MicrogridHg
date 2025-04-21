@@ -17,10 +17,10 @@ def solve_and_plot(hg: chg.Hypergraph, nodes: list, inputs: dict, indices: list=
             continue
         t = hg.solve(node, inputs, min_index=index, to_print=False, search_depth=5000)
         if t is not None:
-            found_values = found_values | t.found_values_new
+            found_values = found_values | t.values
 
         labels = [n.label for n in nodes if n.label in found_values]
-        plot_time_values(labels, found_values, 'elapsed hour')
+        plot_time_values(labels, found_values, 'elapsed hours')
 
 def plot_time_values(labels: list, found_values: dict, time_step: float, 
                    title: str='Simulation'):

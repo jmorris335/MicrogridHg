@@ -15,7 +15,7 @@ HOURS_IN_DAY = 24
 HOURS_IN_YEAR = DAYS_IN_YEAR * HOURS_IN_DAY
 HOURS_IN_LEAPYEAR = DAYS_IN_LEAPYEAR * HOURS_IN_DAY
 
-mg = Hypergraph()
+mg = Hypergraph(no_weights=True)
 
 ## ----- Objects ----- ##
 ### Initialize Objects
@@ -42,10 +42,6 @@ BUILDINGs = [
     Building('Building5Warehouse', BUILDING_TYPE.WAREHOUSE, priority=74),
 ]
 OBJECTS = GENs + BATTERYs + UGs + BUSs + PVs + BUILDINGs
-def get_names_of_objects(objects: list):
-    return [str(o) for o in objects]
-
-NAMES = get_names_of_objects(OBJECTS)
 
 ### Connectivity
 #### Receivers (set which objects are wired to receive power from which other objects)
@@ -84,11 +80,8 @@ for OBJ in OBJECTS:
 
 ## ----- Nodes ----- ##
 ### Setup Conditions
-mg_mode = Node('microgrid mode', MICROGRID_MODE.GRID_CONNECTED, description='mode of microgrid (Enum)')
 has_random_failure = Node('has_random_failure', False, description='true if random failure is allowed')
 is_islanded = Node('is islanded', description='true if the utiliy grid is disconnected')
-sim_length = Node('sim_length', description='num days to simulate')
-sim_length_hours = Node('sim_length_hours', description='num hours to simulate')
 use_random_date = Node('use_random_date', True, description='true if the start date is set randomly')
 num_mc_iterations = Node('num_mc_iterations', 1000, description='number of Monte Carlo iterations')
 min_year = Node('min year', 2000, description='minimum year of simulation data')
@@ -104,9 +97,10 @@ power_wasted = Node('power wasted', 0., description='cumulative power supplied t
 list_load_shedding = Node('list of load shedding', description='a list of objects whose loads are removed from the grid')
 all_loads_shed = Node('all loads shed', description='true if all loads in the graph have been shed (Bool)')
 num_loads = Node('num loads', description='number of loads (buildings) on grid')
+names = Node('names', description='ordered list of names of objects considered in the model')
 
 ### Simulation
-elapsed_hours = Node('elapsed hour', 0, description='number of hours that have passed during the simulation.')
+elapsed_hours = Node('elapsed hours', 0, description='number of hours that have passed during the simulation.')
 start_year = Node('start year', description='starting year for the simulation')
 start_day = Node('start day', description='starting day for the simulation (1-366)')
 start_hour = Node('start hour', 1, description='starting hour for the simulation (1-24)')
@@ -120,7 +114,7 @@ is_leapyear = Node('is leapyear', description='true if the current year is a lea
 tol = Node('tolerance', 0.5, description='float tolerance to be ignored')
 
 ### Components
-sunlight = Node('sunlight', description='energy from sun for a specific hour (W-hr/m^2)')
+sunlight = Node('sunlight', description='energy from sun for a specific hour', units='W-hr/m^2')
 sunlight_data = Node('sunlight_data', description='dict of yearly sunlight values by hour')
 sunlight_filename = Node('sunlight_filename', description='filename for sunlight csv file')
 sunlight_data_label = Node('sunlight_data_label', 'SUNY Dir (Wh/m^2)', description='name of column for sunlight data')
@@ -150,11 +144,6 @@ def Rget_random_hour(**kwargs)-> int:
     rand_hour = random.randint(0, HOURS_IN_DAY-1)
     return rand_hour
 
-def Rcalc_elapsed_time(elapsed_hours: int, **kwargs)-> int:
-    """Iterates the elapsed time by one hour."""
-    elapsed_hours += 1
-    return elapsed_hours
-
 def Rcalc_year(elapsed_hours: int, num_leapyears: int, start_year: int, 
                start_day: int, start_hour: int, **kwargs)-> int:
     """Calculates the current year of the simulation."""
@@ -173,9 +162,9 @@ def Rcalc_day(elapsed_hours: int, start_year: int, year: int, num_leapyears: int
     day =  start_day + elapsed_hours // HOURS_IN_DAY
     return day
 
-def Rcalc_hour(elapsed_hours: int, **kwargs)-> int:
-    """Calculates the current day of the simulation."""
-    hour = elapsed_hours % HOURS_IN_DAY
+def Rcalc_hour(elapsed_hours: int, start_hour: int, **kwargs)-> int:
+    """Calculates the current hour of the simulation."""
+    hour = (start_hour + elapsed_hours) % HOURS_IN_DAY
     return hour
 
 def Rcalc_num_leapyears(start_year: int, elapsed_hours: int, **kwargs)-> int:
@@ -213,7 +202,19 @@ def Rget_float_from_csv_data(csv_data: dict, row, col, **kwargs):
     value = float(csv_data[row][col])
     return value
 
+def Rget_load_from_building_data(csv_data: dict, row, col, **kwargs):
+    """Returns the value in the row and column from the CSV dict reader."""
+    value = float(csv_data[row][col])
+    value *= 1000 #convert from kW to W
+    return value
+
 ## Microgrid
+def Rsort_names(*args, **kwargs)->list:
+    """Sorts the object names into a prefered list."""
+    names = R.extend(args, kwargs)
+    names.sort()
+    return names
+
 def Rdetermine_if_connected(is_failing: bool, is_load_shedding: bool, **kwargs)-> bool:
     """Determines whether or not the object is connected to the grid."""
     return not (is_failing or is_load_shedding)
@@ -222,25 +223,31 @@ def Rcalc_if_receiving_power(receives_from: bool, receiver_conn: bool, provider_
     """Determines if the receiver object is receiving power from the provider object."""
     return receives_from and receiver_conn and provider_conn
 
-def Rform_connectivity_matrix(*args, **kwargs)-> np.ndarray:
+def Rform_connectivity_matrix(names: list, *args, **kwargs)-> np.ndarray:
     """Forms the connectivity (A) matrix where the ij-th cell indicates power is flowing from object j to object i."""
-    A = np.zeros((len(OBJECTS), len(OBJECTS)))
+    A = np.zeros((len(names), len(names)))
     args, kwargs = R.get_keyword_arguments(args, kwargs, KEYNAMES)
     for key, val in kwargs.items():
         if key in KEYNAMES:
             object_names = key.split(KEY_SEP)[:2]
-            i,j = [NAMES.index(name) for name in object_names]
+            i,j = [names.index(name) for name in object_names]
             A[i][j] = 1 if bool(val) else 0
     return A
 
 def Rform_demand_matrix(**kwargs)-> np.ndarray:
     """Forms the demand (B) matrix where the i-th cell indicates the demand for object i."""
-    B = [float(kwargs[name]) if name in kwargs else 0. for name in NAMES]
+    names = kwargs.get('names')
+    demands = {}
+    for value in kwargs.values():
+        if isinstance(value, tuple):
+            name, demand = value
+            demands[name] = demand
+    B = [float(demands.get(name, 0.)) for name in names]
     return np.array(B)
 
-def Rget_state_from_matrix(x: np.ndarray, name: str, **kwargs)-> float:
+def Rget_state_from_matrix(x: np.ndarray, name: str, names: list, **kwargs)-> float:
     """Indexes and returns the state of the object in the state matrix."""
-    i = NAMES.index(name)
+    i = names.index(name)
     out = x[i]
     return out
 
@@ -249,7 +256,7 @@ def Rlinear_solve(A: np.ndarray, B: np.ndarray, **kwargs)-> np.ndarray:
     x = np.linalg.solve(A, B)
     return x
 
-def Rdetermine_load_shedding(balance: float, **kwargs)-> list:
+def Rdetermine_load_shedding(names: list, balance: float, **kwargs)-> list:
     """Returns a list of buildings that are being load shed.
     
     Parameters
@@ -264,7 +271,7 @@ def Rdetermine_load_shedding(balance: float, **kwargs)-> list:
     keyed_args = {}
     for key, val in kwargs.items():
         var, OBJ = key.split(KEY_SEP)[:2]
-        if OBJ not in NAMES: continue
+        if OBJ not in names: continue
         if OBJ not in keyed_args:
             keyed_args[OBJ] = {}
         keyed_args[OBJ].update({var: val})
@@ -375,25 +382,21 @@ def Rcalc_battery_charge_level(state: float, level: float, max_level: float, eff
 
 ## ----- Edges ----- ##
 ### Simulation
-mg.add_edge(sim_length, sim_length_hours, lambda sim_length, **kw : sim_length * HOURS_IN_DAY)
-# mg.add_edge(sim_length_hours, sim_length, lambda sim_length_hours, **kw : sim_length_hours / HOURS_IN_DAY)
 mg.add_edge({'use_rand_date': use_random_date, 'min_year': min_year, 'max_year': max_year}, start_year, 
             Rget_random_year, via=lambda use_rand_date, **kwargs : use_rand_date)
 mg.add_edge(use_random_date, start_day, Rget_random_day, via=lambda s1, **kwargs : s1 is True)
 mg.add_edge(use_random_date, start_hour, Rget_random_hour, via=lambda s1, **kwargs : s1)
-mg.add_edge({'start_year': start_year, 'elapsed_hours': elapsed_hours}, num_leapyears, Rcalc_num_leapyears)
-mg.add_edge({'elapsed_hours': elapsed_hours, 'sim_length_hours': sim_length_hours}, 
-            elapsed_hours, Rcalc_elapsed_time, index_offset=1,
-            via=lambda elapsed_hours, sim_length_hours : elapsed_hours < sim_length_hours)
+mg.add_edge({'start_year': start_year, 'elapsed_hours': elapsed_hours}, num_leapyears, Rcalc_num_leapyears, label='calc_num_leapyears')
+mg.add_edge(elapsed_hours, elapsed_hours, R.Rincrement, index_offset=1)
 mg.add_edge({'elapsed_hours': elapsed_hours, 'start_year': start_year, 'num_leapyears': num_leapyears,
              'start_day': start_day, 'start_hour': start_hour}, year, Rcalc_year,
-             disposable=['elapsed_hours', 'num_leapy3ears'],
+             disposable=['elapsed_hours', 'num_leapyears'],
              index_via=lambda elapsed_hours, num_leapyears, **kw : R.Rsame(elapsed_hours, num_leapyears))
 mg.add_edge({'elapsed_hours': elapsed_hours, 'start_year': start_year, 'year': year, 'num_leapyears': num_leapyears,
              'start_day': start_day, 'start_hour': start_hour}, day, Rcalc_day, 
              disposable=['elapsed_hours', 'year', 'num_leapyears'],
              index_via=lambda elapsed_hours, year, **kw : R.Rsame(elapsed_hours, year))
-mg.add_edge(elapsed_hours, hour, Rcalc_hour)
+mg.add_edge({'elapsed_hours': elapsed_hours, 'start_hour': start_hour}, hour, Rcalc_hour)
 mg.add_edge({'day': day, 'hour': hour, 'is_leapyear': is_leapyear}, hour_idx, Rget_hour_index,
             edge_props='DISPOSE_ALL',
             index_via=lambda day, hour, is_leapyear, **kw : R.Rsame(day, hour, is_leapyear))
@@ -410,14 +413,15 @@ mg.add_edge([B.name for B in BUILDINGs], num_loads, lambda *args, **kwargs : len
 mg.add_edge({'l': list_load_shedding, 'num': num_loads}, all_loads_shed, lambda l, num, **kwargs : len(l) >= num)
 
 ### Objects
+mg.add_edge({o.name for o in OBJECTS}, names, Rsort_names)
 keyed_receiving_nodes = {}
 for OBJ in OBJECTS:
     #### Power Flow
     mg.add_edge({'state': OBJ.state, 'demand': OBJ.demand}, OBJ.is_overloaded, 
                 lambda state, demand, **kwargs :demand > state, edge_props=['LEVEL', 'DISPOSE_ALL'])
-    # mg.add_edge(OBJ.is_connected, OBJ.demand, lambda **kwargs : 0., via=lambda s1, **kwargs : s1 is False)
+    # mg.add_edge(OBJ.is_connected, OBJ.demand, lambda **kwargs : 0., via=lambda s1, **kwargs : s1 is False) #TODO: This should be a super node
     mg.add_edge(OBJ.is_connected, OBJ.state, lambda **kwargs : 0., via=lambda s1, **kwargs : s1 is False)
-    mg.add_edge({'x': state_matrix, 'name': OBJ.name}, OBJ.state, Rget_state_from_matrix, label=f'retrieve state of {str(OBJ)}', index_offset=1)
+    mg.add_edge({'x': state_matrix, 'name': OBJ.name, 'names': names}, OBJ.state, Rget_state_from_matrix, label=f'retrieve state of {str(OBJ)}', index_offset=1)
     for SRC in OBJECTS:
         if SRC is OBJ:
             mg.add_edge({'receives_from': OBJ.receives_from[str(SRC)], 'is_conn': OBJ.is_connected}, 
@@ -445,13 +449,20 @@ for OBJ in OBJECTS:
     mg.add_edge({'is_failing': OBJ.is_failing, 'is_load_shedding': OBJ.is_load_shedding}, 
                 OBJ.is_connected, Rdetermine_if_connected)
 
-mg.add_edge(keyed_receiving_nodes, conn_matrix, Rform_connectivity_matrix, label='form connectivity matrix', 
-            edge_props=['LEVEL', 'DISPOSE_ALL'])
-OBJS_WO_BUSs = set(NAMES) - set(get_names_of_objects(BUSs))
-mg.add_edge({name : demand for name, demand in zip(NAMES, [OBJ.demand for OBJ in OBJECTS])}, demand_matrix, 
-            Rform_demand_matrix, label='form demand matrix',
-            disposable=list(set(NAMES) - set(get_names_of_objects(BUSs))),
-            index_via=lambda **kwargs : R.Rsame(**{key:kwargs[key] for key in OBJS_WO_BUSs}))
+mg.add_edge(keyed_receiving_nodes | {'names': names}, conn_matrix, Rform_connectivity_matrix, label='form connectivity matrix',
+            disposable=[key for key in keyed_receiving_nodes],
+            index_via=lambda **kwargs : R.Rsame(*[kwargs[key] for key in keyed_receiving_nodes]))
+
+demand_pairs, demand_pairs_no_busses = {'names': names}, {}
+for i, OBJ in enumerate(OBJECTS):
+    mg.add_edge({'name': OBJ.name, 'demand': OBJ.demand}, OBJ.demand_pair, R.Rtuple, disposable='demand')
+    demand_pairs[f's{i}'] = OBJ.demand_pair
+    if OBJ not in BUSs:
+        demand_pairs_no_busses[f's{i}'] = OBJ.demand_pair
+        
+mg.add_edge(demand_pairs, demand_matrix, Rform_demand_matrix, label='form demand matrix',
+            disposable=[key for key in demand_pairs_no_busses],
+            index_via=lambda **kwargs : R.Rsame(*[kwargs[key] for key in demand_pairs_no_busses]))
 
 ### Utility Grids
 for UG in UGs:
@@ -475,12 +486,12 @@ for B in BUILDINGs:
     mg.add_edge(B.type, B.building_filename, Rget_building_filename)
     mg.add_edge(B.building_filename, B.load_data, Rget_data_from_csv_file)
     mg.add_edge({'csv_data': B.load_data, 'row': hour_idx, 'col': B.normal_col_name}, 
-                B.normal_load, Rget_float_from_csv_data)
+                B.normal_load, Rget_load_from_building_data)
     mg.add_edge({'csv_data': B.load_data, 'row': hour_idx, 'col': B.lights_col_name}, 
-                B.lights_load, Rget_float_from_csv_data)
+                B.lights_load, Rget_load_from_building_data)
     mg.add_edge({'csv_data': B.load_data, 'row': hour_idx, 'col': B.equipment_col_name}, 
-                B.equipment_load, Rget_float_from_csv_data)
-    mg.add_edge({'lights': B.lights_load, 'equipment': B.equipment_load}, 
+                B.equipment_load, Rget_load_from_building_data)
+    mg.add_edge({'lights': B.lights_load, 'equipment': B.equipment_load},
                 B.critical_load, Rcalc_critical_load, edge_props=['LEVEL', 'DISPOSE_ALL'])
     #TODO: Need a way to tell if a building is connected to the Utility Grid for bus failures that should induce critical loads
     mg.add_edge({'conn': B.is_connected, 'normal': B.normal_load, 'critical': B.critical_load, 'island': is_islanded}, 
@@ -489,7 +500,7 @@ for B in BUILDINGs:
     shedding_nodes[state_label] = B.state
     shedding_nodes[priority_label] = B.priority
     shedding_nodes[index_label] = (state_label, 'index')
-mg.add_edge(shedding_nodes, list_load_shedding, Rdetermine_load_shedding, via=Vload_nodes_are_level, 
+mg.add_edge(shedding_nodes | {'names': names}, list_load_shedding, Rdetermine_load_shedding, via=Vload_nodes_are_level, 
             disposable=[generate_building_keyword(B, 'load') for B in BUILDINGs] + ['balance'])
 
 ### Generators
