@@ -19,7 +19,7 @@ mg = Hypergraph(no_weights=True)
 
 ## ----- Objects ----- ##
 ### Initialize Objects
-UGs = [GridObject('UtilityGrid')]
+UGs = [GridObject('UtilityGrid', is_load_shedding=False)]
 BUSs = [
     GridObject('Bus1', demand=0),
     GridObject('Bus2', demand=0),
@@ -80,10 +80,10 @@ for OBJ in OBJECTS:
 
 ## ----- Nodes ----- ##
 ### Setup Conditions
+island_mode = Node('island_mode', description='true if the utility grid is to be treated as disconnected')
 has_random_failure = Node('has_random_failure', False, description='true if random failure is allowed')
-is_islanded = Node('is islanded', description='true if the utiliy grid is disconnected')
 use_random_date = Node('use_random_date', True, description='true if the start date is set randomly')
-num_mc_iterations = Node('num_mc_iterations', 1000, description='number of Monte Carlo iterations')
+# num_mc_iterations = Node('num_mc_iterations', 1000, description='number of Monte Carlo iterations')
 min_year = Node('min year', 2000, description='minimum year of simulation data')
 max_year = Node('max year', 2009, description='maximum year of simulation data')
 prob_daily_refueling = Node('prob of daily refueling', 0.25, description='probability that the generators receive new fuel every day')
@@ -114,6 +114,7 @@ is_leapyear = Node('is leapyear', description='true if the current year is a lea
 tol = Node('tolerance', 0.5, description='float tolerance to be ignored')
 
 ### Components
+is_islanded = Node('is islanded', description='true if the utiliy grid is disconnected')
 sunlight = Node('sunlight', description='energy from sun for a specific hour', units='W-hr/m^2')
 sunlight_data = Node('sunlight_data', description='dict of yearly sunlight values by hour')
 sunlight_filename = Node('sunlight_filename', description='filename for sunlight csv file')
@@ -418,7 +419,7 @@ keyed_receiving_nodes = {}
 for OBJ in OBJECTS:
     #### Power Flow
     mg.add_edge({'state': OBJ.state, 'demand': OBJ.demand}, OBJ.is_overloaded, 
-                lambda state, demand, **kwargs :demand > state, edge_props=['LEVEL', 'DISPOSE_ALL'])
+                lambda state, demand, **kwargs : demand > state, edge_props=['LEVEL', 'DISPOSE_ALL'])
     # mg.add_edge(OBJ.is_connected, OBJ.demand, lambda **kwargs : 0., via=lambda s1, **kwargs : s1 is False) #TODO: This should be a super node
     mg.add_edge(OBJ.is_connected, OBJ.state, lambda **kwargs : 0., via=lambda s1, **kwargs : s1 is False)
     mg.add_edge({'x': state_matrix, 'name': OBJ.name, 'names': names}, OBJ.state, Rget_state_from_matrix, label=f'retrieve state of {str(OBJ)}', index_offset=1)
@@ -445,9 +446,10 @@ for OBJ in OBJECTS:
                 via=lambda is_failing, **kwargs : is_failing is True)
     #TODO: Need a way to specify failures of connectivity (like BUS1/BUS2 line)
     mg.add_edge({'shedding_list': list_load_shedding, 'name': OBJ.name}, OBJ.is_load_shedding, 
-                lambda shedding_list, name, **kwargs :name in shedding_list)
-    mg.add_edge({'is_failing': OBJ.is_failing, 'is_load_shedding': OBJ.is_load_shedding}, 
-                OBJ.is_connected, Rdetermine_if_connected)
+                    lambda shedding_list, name, **kwargs : name in shedding_list)
+    if OBJ not in UGs:
+        mg.add_edge({'is_failing': OBJ.is_failing, 'is_load_shedding': OBJ.is_load_shedding}, 
+                    OBJ.is_connected, R.Rnot_any)
 
 mg.add_edge(keyed_receiving_nodes | {'names': names}, conn_matrix, Rform_connectivity_matrix, label='form connectivity matrix',
             disposable=[key for key in keyed_receiving_nodes],
@@ -455,20 +457,23 @@ mg.add_edge(keyed_receiving_nodes | {'names': names}, conn_matrix, Rform_connect
 
 demand_pairs, demand_pairs_no_busses = {'names': names}, {}
 for i, OBJ in enumerate(OBJECTS):
-    mg.add_edge({'name': OBJ.name, 'demand': OBJ.demand}, OBJ.demand_pair, R.Rtuple, disposable='demand')
+    mg.add_edge({'name': OBJ.name, 'demand': OBJ.demand}, OBJ.demand_pair, lambda name, demand : R.Rtuple(name, demand), disposable='demand')
     demand_pairs[f's{i}'] = OBJ.demand_pair
     if OBJ not in BUSs:
         demand_pairs_no_busses[f's{i}'] = OBJ.demand_pair
-        
+
 mg.add_edge(demand_pairs, demand_matrix, Rform_demand_matrix, label='form demand matrix',
             disposable=[key for key in demand_pairs_no_busses],
             index_via=lambda **kwargs : R.Rsame(*[kwargs[key] for key in demand_pairs_no_busses]))
 
 ### Utility Grids
 for UG in UGs:
+    mg.add_edge({'island': island_mode, 'failing': UG.is_failing, 'load_shedding': UG.is_load_shedding}, 
+                UG.is_connected, R.Rnot_any, disposable='failing')
     mg.add_edge({'conn': UG.is_connected, 'balance': total_power_balance}, UG.demand, 
                 lambda conn, balance, **kw : balance if conn else 0., edge_props='LEVEL')
-mg.add_edge(*[UG.is_connected for UG in UGs], is_islanded, lambda *args, **kwargs :not any(R.extend(args, kwargs)))
+mg.add_edge(*[UG.is_connected for UG in UGs], is_islanded, lambda *args, **kwargs :not any(R.extend(args, kwargs)),
+            edge_props=['LEVEL', 'DISPOSE_ALL'])
 
 ### Solar
 mg.add_edge(year, sunlight_filename, Rget_solar_filename)
@@ -481,6 +486,7 @@ for PV in PVs:
                 index_via=lambda conn, sunlight, **kw : R.Rsame(conn, sunlight))
 
 ### Buildings
+#TODO: There needs to be a more systematic way of indicating that an object solves for load_shedding.
 shedding_nodes = {'balance': total_power_balance, generate_building_keyword('balance', 'index') : ('balance', 'index')}
 for B in BUILDINGs:
     mg.add_edge(B.type, B.building_filename, Rget_building_filename)

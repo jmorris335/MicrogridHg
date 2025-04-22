@@ -26,8 +26,10 @@ class GridObject:
         for source, val in dict(kwargs.get('receiving_from', {})).items():
             self.add_active_source(source, val)
         demand = kwargs.get('demand', None) 
-        self.demand_pair = Node(f'demand_pair_{name}', (name, demand) if demand is not None else None, 
-                                    description='keyed connection to demand')
+        self.demand_pair = Node(f'demand_pair_{name}', None, description='keyed connection to demand')
+        # HACK: This node receives no default value (as it should, given below) because right now the microgrid resolves for input nodes.
+        # self.demand_pair = Node(f'demand_pair_{name}', None if demand is None else (name, demand), 
+        #                             description='keyed connection to demand')
     
     def add_source(self, source, val: bool=True):
         """Creates a node indicating that the source GridObject is wired to provide power to this GridObject."""
