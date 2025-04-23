@@ -141,7 +141,7 @@ mg.add_edge({'elapsed_hours': elapsed_hours, 'start_year': start_year, 'year': y
 mg.add_edge({'elapsed_hours': elapsed_hours, 'start_hour': start_hour, 'hours_in_day': hours_in_day}, hour, Rcalc_hour)
 mg.add_edge({'day': day, 'hour': hour, 'is_leapyear': is_leapyear, 'hours_in_year': hours_in_year, 
              'hours_in_leapyear': hours_in_leapyear, 'hours_in_day': hours_in_day}, hour_idx, Rget_hour_index,
-            dispoable=['day', 'hour', 'is_leapyear'],
+            disposable=['day', 'hour', 'is_leapyear'],
             index_via=lambda day, hour, is_leapyear, **kw : R.Rsame(day, hour, is_leapyear))
 mg.add_edge(year, is_leapyear, Rcalc_year_is_leapyear)
 
