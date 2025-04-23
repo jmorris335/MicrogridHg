@@ -17,8 +17,8 @@ debug_nodes = {'island_balance'} if False else None
 debug_edges = {'form demand matrix'} if True else None
 
 # Solve for a single node
-t = mg.solve(demand_matrix, inputs, min_index=2, to_print=False, search_depth=3000, 
-             debug_nodes=debug_nodes, debug_edges=debug_edges, logging_level=logging.DEBUG+1)
+t = mg.solve(demand_matrix, inputs, min_index=3, to_print=False, search_depth=3000, 
+             debug_nodes=debug_nodes, debug_edges=debug_edges, logging_level=logging.INFO)
 print(t.value)
 
 # Solve for multiple nodes and indices (exhaustive)

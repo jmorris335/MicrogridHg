@@ -1,0 +1,12 @@
+Scenario,Two week Islanded Operation. Failure Allowed.
+PV Area,10000
+PV Eff,0.18
+Gen Capacity,300
+Gen Storage,2500
+Gen Refueling,336
+Refueling Pr,0
+Same Fuel Supply,1
+BT1 Capacity,10000
+BT1 Output,1000
+Iterations,20
+Year,2000

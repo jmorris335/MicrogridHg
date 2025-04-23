@@ -5,6 +5,8 @@ import random
 from microgrid_objects import *
 from microgrid_relations import *
 
+#TODO: Singular matrices coming if source is not sufficient, need to have error handling for when the grid collapses (set the state to 0 basically)
+
 random.seed(3)
 
 mg = Hypergraph(no_weights=True)
