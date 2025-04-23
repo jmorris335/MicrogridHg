@@ -12,15 +12,29 @@ def solve_and_plot(hg: chg.Hypergraph, nodes: list, inputs: dict, indices: list=
     else:
         indices = [1 if i is None else i for i in indices]
 
-    for node, index in zip(nodes, indices):
-        if len(found_values.get(node.label, [])) >= index:
+    for node, min_index in zip(nodes, indices):
+        if len(found_values.get(node.label, [])) >= min_index:
             continue
-        t = hg.solve(node, inputs, min_index=index, to_print=False, search_depth=5000)
-        if t is not None:
-            found_values = found_values | t.values
+        found_values = solve_and_append(hg, found_values, node, inputs, min_index, to_print=False, search_depth=5000)
+        if found_values is not None:
+            if len(found_values[node.label]) < min_index:
+                found_values[node.label] = [] #clear previous find
+                for index in range(min_index):
+                    found_values = solve_and_append(hg, found_values, node, inputs, index, to_print=False, search_depth=5000)
 
-        labels = [n.label for n in nodes if n.label in found_values]
-        plot_time_values(labels, found_values, 'elapsed hours')
+    labels = [n.label for n in nodes if n.label in found_values]
+    plot_time_values(labels, found_values, 'elapsed hours')
+
+def solve_and_append(hg: chg.Hypergraph, found_values: dict, node: chg.Node, inputs: dict, min_index: int, **kwargs):
+    """Solves the graph for the node at the given index and adds its value to the dict of found values."""
+    t = hg.solve(node, inputs, min_index=min_index, to_print=False, search_depth=5000)
+    if t is None:
+        return None
+    if node.label not in found_values:
+        found_values[node.label] = []
+    found_values[node.label].extend(t.values[node.label])
+    found_values =  t.values | found_values
+    return found_values
 
 def plot_time_values(labels: list, found_values: dict, time_step: float, 
                    title: str='Simulation'):

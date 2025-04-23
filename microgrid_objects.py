@@ -17,7 +17,7 @@ class GridObject:
                                  description='more power is being demanded of an object than can be supplied')
         self.is_load_shedding = Node(f'{name} is load shedding', kwargs.get('is_load_shedding', False),
                                 description='true if the object is deliberately disconnected from the grid')
-        self.demand = Node(f'demand_{name}', kwargs.get('demand', None), description='load of object demanded from grid', units='W')
+        self.demand = Node(f'demand_{name}', kwargs.get('demand', None), description='load of object demanded from (-) or providing to (+) the grid', units='W')
         self.state = Node(f'state_{name}', kwargs.get('state', None), description='amount of power actively receiving (-) or providing (+)', units='W')
         self.receives_from = {name: Node(f'{name} receives from itself', True, description=f'{name} receives power from itself (trivial)')}
         for source, val in dict(kwargs.get('receives_from', {})).items():
