@@ -37,7 +37,7 @@ The objects are techinically classes, but the data for each class is exclusively
 Each node is defined in this section by calling the `Node` constructor from the ConstraintHg package. This section is where labels are provided for the various state variables of the system, with the exception of the the nodes for each grid object (provided in the previous section). Variables that have static values (such as the `output_filename`) can be set in the constructor call here. More information is available at the documentation [here](https://constrainthg.readthedocs.io/en/latest/constrainthg.html#constrainthg.hypergraph.Node.__init__).
 
 4. **Define relationships**
-The constraints in the hypergraph are given by functions, most of which are defined here. Each function is a normal Python method that takes in a set of values as parameters and returns a single value (including arraylike values such as lists and tuples). The only caveat is that each method must take in an arbitrary set of keyed and unkeyed arguments--in other words the arguments must be in the following style:
+The constraints in the hypergraph are given by functions, most of which are defined in `microgrid_relations`, though some generic ones are given in the `ConstraintHg.relations` module. Each function is a normal Python method that takes in a set of values as parameters and returns a single value (including arraylike values such as lists and tuples). The only caveat is that each method must take in an arbitrary set of keyed and unkeyed arguments--in other words the arguments must be in the following style:
 ```python
     def method_name(arg1, arg2, ..., argn, *args, **kwargs):
 ```
