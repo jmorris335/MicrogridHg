@@ -11,10 +11,10 @@ mg = Hypergraph(no_weights=True)
 
 ## ----- Objects ----- ##
 ### Initialize Objects
-UGs = [GridObject('UtilityGrid', is_load_shedding=False)]
+UG = GridObject('UtilityGrid', is_load_shedding=False)
 BUSs = [
-    GridObject('Bus1', demand=0),
-    GridObject('Bus2', demand=0),
+    GridObject('Bus1'),
+    GridObject('Bus2'),
 ]
 PVs = [
     PhotovoltaicArray('PV1', area=10000, efficiency=.18)
@@ -33,7 +33,7 @@ BUILDINGs = [
     Building('Building4Large', BUILDING_TYPE.LARGE, priority=93),
     Building('Building5Warehouse', BUILDING_TYPE.WAREHOUSE, priority=74),
 ]
-OBJECTS = GENs + BATTERYs + UGs + BUSs + PVs + BUILDINGs
+OBJECTS = GENs + BATTERYs + [UG] + BUSs + PVs + BUILDINGs
 
 ### Connectivity
 #### Receivers (set which objects are wired to receive power from which other objects)
@@ -41,7 +41,7 @@ for OBJ in OBJECTS: #Set default as not connected
     for SRC in OBJECTS:
         OBJ.add_source(SRC, SRC is OBJ)
 
-for SRC in list(BUSs + UGs + GENs):
+for SRC in list(BUSs + [UG] + GENs):
     BUSs[0].add_source(SRC, True)
 for SRC in list(BUSs + BATTERYs + PVs):
     BUSs[1].add_source(SRC, True)
@@ -80,6 +80,8 @@ prob_daily_refueling = Node('prob of daily refueling', 0.25, description='probab
 conn_matrix = Node('connectivity matrix', description='cell ij indicates object[i] receives power from object[j]')
 demand_matrix = Node('demand matrix', description='desired state for each object on the grid')
 state_matrix = Node('state matrix', description='state from each object on the grid')
+total_load = Node('total_load', description='total power required to run the microgrid')
+islanded_balance = Node('islanded_balance', description='balance of grid sans Utility Grid')
 total_power_balance = Node('total power supplied', 0., description='total balance of power supplied (+) or demanded (-) by grid (W)')
 power_wasted = Node('power wasted', 0., description='cumulative power supplied to grid in excess of current demand (W)')
 list_load_shedding = Node('list of load shedding', description='a list of objects whose loads are removed from the grid')
@@ -112,8 +114,8 @@ batt_trickle = Node('battery trickle charge rate prop', 0.25, description='propo
 next_refuel_hour = Node('next refuel hour', 0, description='next hour generators will be refueled')
 
 ### Outputs
-output_filename = Node('output filename', 'output.txt', description='name of output file')
-failing_objects = Node('failing_objects', description='list of failing components')
+# output_filename = Node('output filename', 'output.txt', description='name of output file')
+# failing_objects = Node('failing_objects', description='list of failing components')
 
 
 ## ----- Edges ----- ##
@@ -152,10 +154,10 @@ mg.add_edge(state_matrix, total_power_balance, lambda s1, **kwargs : sum(s1), in
 mg.add_edge({'wasted': power_wasted, 'balance': total_power_balance}, power_wasted, 
             lambda wasted, balance, **kwargs : wasted + min(0., balance), index_offset=1, edge_props=['LEVEL', 'DISPOSE_ALL'])
 mg.add_edge([B.name for B in BUILDINGs], num_loads, lambda *args, **kwargs : len(R.extend(args, kwargs)))
-
 mg.add_edge({'l': list_load_shedding, 'num': num_loads}, all_loads_shed, lambda l, num, **kwargs : len(l) >= num)
 
 ### Objects
+mg.add_edge([o.demand for o in OBJECTS if o != UG], islanded_balance, R.Rsum, label='calc_island_balance', edge_props=['LEVEL', 'DISPOSE_ALL'])
 mg.add_edge({o.name for o in OBJECTS}, names, Rsort_names)
 keyed_receiving_nodes = {}
 for OBJ in OBJECTS:
@@ -189,7 +191,7 @@ for OBJ in OBJECTS:
     #TODO: Need a way to specify failures of connectivity (like BUS1/BUS2 line)
     mg.add_edge({'shedding_list': list_load_shedding, 'name': OBJ.name}, OBJ.is_load_shedding, 
                     lambda shedding_list, name, **kwargs : name in shedding_list)
-    if OBJ not in UGs:
+    if OBJ != UG:
         mg.add_edge({'is_failing': OBJ.is_failing, 'is_load_shedding': OBJ.is_load_shedding}, 
                     OBJ.is_connected, R.Rnot_any)
 
@@ -197,24 +199,25 @@ mg.add_edge(keyed_receiving_nodes | {'names': names, 'key_sep': key_sep}, conn_m
             disposable=[key for key in keyed_receiving_nodes],
             index_via=lambda **kwargs : R.Rsame(*[kwargs[key] for key in keyed_receiving_nodes]))
 
-demand_pairs, demand_pairs_no_busses = {'names': names}, {}
+#### Demand matrix
+demand_pairs = {'names': names}
 for i, OBJ in enumerate(OBJECTS):
     mg.add_edge({'name': OBJ.name, 'demand': OBJ.demand}, OBJ.demand_pair, lambda name, demand : R.Rtuple(name, demand), disposable='demand')
     demand_pairs[f's{i}'] = OBJ.demand_pair
-    if OBJ not in BUSs:
-        demand_pairs_no_busses[f's{i}'] = OBJ.demand_pair
+mg.add_edge(demand_pairs, demand_matrix, Rform_demand_matrix, label='form demand matrix', 
+            disposable=[key for key in demand_pairs if key != 'names'],
+            index_via=lambda **kwargs : R.Rsame(*[kwargs[key] for key in demand_pairs if key != 'names']))
 
-mg.add_edge(demand_pairs, demand_matrix, Rform_demand_matrix, label='form demand matrix',
-            disposable=[key for key in demand_pairs_no_busses],
-            index_via=lambda **kwargs : R.Rsame(*[kwargs[key] for key in demand_pairs_no_busses]))
+### Busses
+for BUS in BUSs:
+    mg.add_edge(elapsed_hours, BUS.demand, R.Rnull)
 
 ### Utility Grids
-for UG in UGs:
-    mg.add_edge({'island': island_mode, 'failing': UG.is_failing, 'load_shedding': UG.is_load_shedding}, 
-                UG.is_connected, R.Rnot_any, disposable='failing')
-    mg.add_edge({'conn': UG.is_connected, 'balance': total_power_balance}, UG.demand, 
-                lambda conn, balance, **kw : balance if conn else 0., edge_props='LEVEL')
-mg.add_edge(*[UG.is_connected for UG in UGs], is_islanded, lambda *args, **kwargs :not any(R.extend(args, kwargs)),
+mg.add_edge({'island': island_mode, 'failing': UG.is_failing, 'load_shedding': UG.is_load_shedding}, 
+            UG.is_connected, R.Rnot_any, disposable='failing')
+mg.add_edge({'conn': UG.is_connected, 'load': islanded_balance}, UG.demand, #TODO: This really should be the load of everything connected to the UG
+            lambda conn, load, **kw : abs(load) if conn else 0., edge_props='LEVEL')
+mg.add_edge(UG.is_connected, is_islanded, lambda *args, **kwargs :not any(R.extend(args, kwargs)),
             edge_props=['LEVEL', 'DISPOSE_ALL'])
 
 ### Solar
@@ -228,6 +231,7 @@ for PV in PVs:
                 index_via=lambda conn, sunlight, **kw : R.Rsame(conn, sunlight))
 
 ### Buildings
+mg.add_edge([B.demand for B in BUILDINGs], total_load, Rdetermine_load, edge_props=['LEVEL', 'DISPOSE_ALL'])
 #TODO: There needs to be a more systematic way of indicating that an object solves for load_shedding.
 shedding_nodes = {'balance': total_power_balance, generate_building_keyword('balance', 'index') : ('balance', 'index')}
 for B in BUILDINGs:
@@ -258,10 +262,10 @@ mg.add_edge({'refuel_time': next_refuel_hour, 'curr_hour': hour_idx, 'prob': pro
             index_via=lambda refuel_time, curr_hour, **kw : R.Rsame(refuel_time, curr_hour))
 for G in GENs:
     mg.add_edge({'fl': G.fuel_level, 'tol': tol}, G.out_of_fuel, lambda fl, tol, **kwargs :abs(fl) < tol)
-    mg.add_edge({'demand': G.demand, 'max_out': G.max_output, 'conn': G.is_connected, 'out_of_fuel': G.out_of_fuel}, 
-                G.demand, Rcalc_generator_demand, index_offset=1, label=f'calc demand for {G}',
-                disposable=['demand', 'conn', 'out_of_fuel'],
-                index_via=lambda demand, conn, out_of_fuel, **kw : R.Rsame(demand, conn, out_of_fuel))
+    mg.add_edge({'is_islanded': is_islanded, 'load': total_load, 'max_out': G.max_output, 'conn': G.is_connected, 'out_of_fuel': G.out_of_fuel}, 
+                G.demand, Rcalc_generator_demand, label=f'calc demand for {G}',
+                disposable=['is_islanded', 'load', 'conn', 'out_of_fuel'],
+                index_via=lambda is_islanded, load, conn, out_of_fuel, **kw : R.Rsame(is_islanded, load, conn, out_of_fuel))
     mg.add_edge({'init': G.starting_fuel_level, 'max': G.fuel_capacity}, G.fuel_level, R.Rmin)
     mg.add_edge({'refuel_time': next_refuel_hour, 'curr_hour': hour_idx, 'curr_level': G.fuel_level,
                  'max_level': G.fuel_capacity}, G.fuel_level, Rcalc_generator_fuel_level, 
@@ -270,18 +274,18 @@ for G in GENs:
 
 ### Batteries
 for B in BATTERYs:
-    mg.add_edge({'island': is_islanded, 'balance': total_power_balance, 'all_loads_shed': all_loads_shed,
+    mg.add_edge({'island': is_islanded, 'load': total_load, 'all_loads_shed': all_loads_shed,
                  'level': B.charge_level, 'capacity': B.charge_capacity}, 
                 B.is_charging, Rdetermine_battery_is_charging, label='determine if battery is charging',
-                disposable=['island', 'balance', 'all_loads_shed'],
-                index_via=lambda island, balance, level, all_loads_shed, **kw : 
-                    R.Rsame(island, balance, level, all_loads_shed-1))
-    mg.add_edge({'is_charging': B.is_charging, 'grid_balance': total_power_balance, 'level':B.charge_level, 
+                disposable=['island', 'load', 'all_loads_shed'],
+                index_via=lambda island, load, level, all_loads_shed, **kw : 
+                    R.Rsame(island, load, level, all_loads_shed-1))
+    mg.add_edge({'is_charging': B.is_charging, 'load': total_load, 'level':B.charge_level, 
                  'capacity': B.charge_capacity, 'max_rate': B.max_charge_rate, 'max_output': B.max_output, 
                  'trickle_prop': batt_trickle}, 
                 B.demand, Rcalc_battery_demand, label='calc battery demand',
-                disposable=['level', 'is_charging', 'balance'],
-                index_via=lambda is_charging, grid_balance, level, **kw : R.Rsame(is_charging-1, grid_balance, level))
+                disposable=['level', 'is_charging', 'load'],
+                index_via=lambda is_charging, load, level, **kw : R.Rsame(is_charging-1, load, level))
     mg.add_edge({'state': B.state, 'level': B.charge_level, 'max_level': B.charge_capacity, 'eff': B.efficiency}, 
                 B.charge_level, Rcalc_battery_charge_level, label='calc battery charge level',
                 index_via=lambda state, level, **kw: R.Rsame(state-1, level))

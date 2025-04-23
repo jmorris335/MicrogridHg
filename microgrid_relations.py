@@ -111,6 +111,14 @@ def Rsort_names(*args, **kwargs)->list:
     names.sort()
     return names
 
+def Rdetermine_load(*args, **kwargs)->float:
+    """Determines the amount of energy necessary to run the microgrid.
+    
+    Note output is always negative or zero, since loads are always negative."""
+    demands = R.extend(args, kwargs)
+    load = -sum([abs(d) for d in demands if d < 0.])
+    return load
+
 def Rdetermine_if_connected(is_failing: bool, is_load_shedding: bool, **kwargs)-> bool:
     """Determines whether or not the object is connected to the grid."""
     return not (is_failing or is_load_shedding)
@@ -184,9 +192,16 @@ def Rdetermine_load_shedding(names: list, balance: float, key_sep: str, **kwargs
     return to_shed
 
 def Vload_nodes_are_level(key_sep: str, **kwargs)-> bool:
-    '''Returns true if all the indices for the load nodes are the same.'''
+    """Returns true if all the indices for the load nodes are the same."""
     load_node_indices = {kwargs[kw] for kw in kwargs if kw.split(key_sep)[0] == 'index'}
     return len(load_node_indices) == 1
+
+## Utility Grid
+def Rcalc_ug_demand(conn: bool, islanded_balance: float, *args, **kwargs)-> float:
+    """Calculates the demand of the utility grid based off of current balance."""
+    if not conn or islanded_balance > 0.:
+        return 0.
+    return abs(islanded_balance)
 
 ## Solar
 def Rget_solar_filename(year: str, **kwargs)-> str:
@@ -226,11 +241,11 @@ def Rdetermine_building_load(conn: bool, normal: float, critical: float, island:
     return load
 
 ## Generators
-def Rcalc_generator_demand(demand: float, max_out: float, out_of_fuel: bool, conn: bool, **kwargs)-> float:
+def Rcalc_generator_demand(is_islanded: bool, load: float, max_out: float, out_of_fuel: bool, conn: bool, **kwargs)-> float:
     """Calculates how much power the generator is capable of supplying."""
-    if not conn or out_of_fuel:
+    if any([not conn, not is_islanded, out_of_fuel]):
         return 0.
-    return max(0., min(demand, max_out))
+    return max(0., min(abs(load), max_out))
 
 def Rcalc_next_time_for_refueling(refuel_time: int, curr_hour: int, prob: float, hours_in_day: int, **kwargs):
     """Calculates the next time for refueling based on the current time."""
@@ -250,12 +265,12 @@ def Rcalc_generator_fuel_level(refuel_time: int, curr_hour: int, curr_level: flo
     return max_level
 
 ## Batteries
-def Rcalc_battery_demand(is_charging: bool, grid_balance: float, level: float, capacity: float, max_rate: float, 
+def Rcalc_battery_demand(is_charging: bool, load: float, level: float, capacity: float, max_rate: float, 
                          max_output: float, trickle_prop: float, **kwargs)-> float:
     """Calculates the demand of the battery."""
-    if grid_balance < 0:
+    if load < 0:
         highest_output = min(max_output, level)
-        demand = max(0, min(grid_balance, highest_output))
+        demand = max(0, min(abs(load), highest_output))
     elif is_charging:
         if level < 0.8 * capacity:
             demand = trickle_prop * max_rate
@@ -265,9 +280,9 @@ def Rcalc_battery_demand(is_charging: bool, grid_balance: float, level: float, c
         demand = 0
     return demand
 
-def Rdetermine_battery_is_charging(island: bool, balance: float, level: float, capacity: float, all_loads_shed: bool, **kwargs)-> bool:
+def Rdetermine_battery_is_charging(island: bool, load: float, level: float, capacity: float, all_loads_shed: bool, **kwargs)-> bool:
     """Determines if the battery should be charging or not."""
-    if island or balance < 0 or all_loads_shed:
+    if not island or load < 0 or all_loads_shed:
         return False
     return level < capacity
 
