@@ -4,7 +4,7 @@ import csv
 import numpy as np
 import logging
 
-from microgrid_objects import *
+from microgrid_actors import *
 
 #TODO: We shouldn't be passing information by node IDs, this should be implemented with tuples
 KEY_SEP = '¦&¦' #A unique constant for seperating strings in paired keywordss
@@ -106,7 +106,6 @@ def Rget_float_from_csv_data(csv_data: dict, row, col, **kwargs):
 def Rget_load_from_building_data(csv_data: dict, row, col, **kwargs):
     """Returns the value in the row and column from the CSV dict reader."""
     value = float(csv_data[row][col])
-    value *= 1000 #convert from kW to W
     return value
 
 
@@ -238,12 +237,19 @@ def Rget_solar_filename(year: str, **kwargs)-> str:
 
 def Rcalc_solar_demand(conn: bool, area: float, efficiency: float, 
                        sunlight: float, **kwargs)-> float:
-    """Calculates the power (in W) produced by a photovoltaic cell over one hour."""
-    if not conn:
-        return 0.0
-    power = max(0, area * efficiency * sunlight / 1000)
+    """Calculates the power (in kW) produced by a photovoltaic cell over one hour."""
+    # if not conn:
+    #     return 0.0
+    power = max(0, area * efficiency * sunlight)
     return power
 
+
+## Wind
+def Rcalc_wind_supply(area: float, power_coef: float, velocity: float,
+                      density: float)-> float:
+    """Calculates the power (in kW) produced by a wind turbine over one hour."""
+    supply = abs(1/2 * density * area * velocity**3 * power_coef)
+    return supply
 
 ## Buildings
 def Rget_building_filename(building_type: BUILDING_TYPE, **kwargs)-> str:

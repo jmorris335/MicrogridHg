@@ -2,7 +2,7 @@ from constrainthg import Node, Hypergraph
 import constrainthg.relations as R
 import random
 
-from microgrid_objects import *
+from microgrid_actors import *
 from microgrid_relations import *
 
 #TODO: Singular matrices coming if source is not sufficient, need to have error 
@@ -12,25 +12,51 @@ random.seed(3)
 
 mg = Hypergraph(no_weights=True)
 
-## ----- Objects ----- ##
-### Initialize Objects
-UG = GridActor('UtilityGrid', is_load_shedding=False)
+## ----- Actors ----- ##
+### Initialize Actors
+UGs = [
+    GridActor('UtilityGrid', 
+              is_load_shedding=False,
+              benefit=0.4,
+              cost=0.13,
+              req_demand=0.,
+              max_demand=120.,
+              supply=20000.,
+    )
+]
 BUSs = [
     GridActor('Bus1'),
     GridActor('Bus2'),
 ]
 PVs = [
-    PhotovoltaicArray('PV1', area=10000, efficiency=.18)
+    PhotovoltaicArray('PV1', 
+                      area=10000,
+                      efficiency=.18
+    )
 ]
+WINDs = []
 GENs = [
-    Generator('Generator1', fuel_capacity=2500., starting_fuel_level=2500., 
-              max_output=30000., efficiency=0.769), 
-    Generator('Generator2', fuel_capacity=2500., starting_fuel_level=2500., 
-              max_output=30000., efficiency=0.769), 
+    Generator('Generator1', 
+              fuel_capacity=2500., 
+              starting_fuel_level=2500., 
+              max_output=30000., 
+              efficiency=0.769
+    ), 
+    Generator('Generator2', 
+              fuel_capacity=2500., 
+              starting_fuel_level=2500., 
+              max_output=30000., 
+              efficiency=0.769
+    ), 
 ]
 BATTERYs = [
-    Battery('Battery1', charge_capacity=10000., charge_level=10000., 
-            max_output=100000., efficiency=0.9747, max_charge_rate=2000.),
+    Battery('Battery1', 
+            charge_capacity=10000.,
+            charge_level=10000., 
+            max_output=100000.,
+            efficiency=0.9747,
+            max_charge_rate=2000.
+    ),
 ]
 BUILDINGs = [
     Building('Building1Small', BUILDING_TYPE.SMALL, priority=10),
@@ -39,29 +65,50 @@ BUILDINGs = [
     Building('Building4Large', BUILDING_TYPE.LARGE, priority=93),
     Building('Building5Warehouse', BUILDING_TYPE.WAREHOUSE, priority=74),
 ]
-OBJECTS = GENs + BATTERYs + [UG] + BUSs + PVs + BUILDINGs
+ACTORS = GENs + BATTERYs + UGs + BUSs + PVs + BUILDINGs
 
 ### Connectivity
-#### Receivers (set which objects are wired to receive power from which other objects)
-for OBJ in OBJECTS: #Set default as not connected
-    for SRC in OBJECTS:
-        OBJ.add_source(SRC, SRC is OBJ)
+#### Receivers (set which actors are wired to receive power from which other actors)
+for ACTOR in ACTORS: #Set default as not connected
+    for SRC in ACTORS:
+        ACTOR.add_source(SRC, SRC is ACTOR)
 
-for SRC in list(BUSs + GENs):
+
+bus0 = UGs + GENs + [BUILDINGs[i] for i in [0, 3, 4]] + BUSs[1]
+bus1 = BATTERYs + PVs + [b for b in set(BUILDINGs).difference(bus0)] + BUSs[0]
+
+for SRC in bus0:
     BUSs[0].add_source(SRC, True)
-for SRC in list(BUSs + BATTERYs + PVs):
+    SRC.add_source(BUSs[0], True)
+for SRC in bus1:
     BUSs[1].add_source(SRC, True)
-BUILDINGs[0].add_source(BUSs[0], True)
-BUILDINGs[1].add_source(BUSs[1], True)
-BUILDINGs[2].add_source(BUSs[1], True)
-BUILDINGs[3].add_source(BUSs[0], True)
-BUILDINGs[4].add_source(BUSs[0], True)
-BATTERYs[0].add_source(BUSs[1], True)
+    SRC.add_source(BUSs[1], True)
 
-#### Active receivers (initialize nodes for objects actively receiving power from other objects)
-for OBJ in OBJECTS:
-    for SRC in OBJECTS:
-        OBJ.add_active_source(SRC, None)
+# for SRC in BUS1:
+#     for SINK in BUS1:
+#         SRC.add_source(SINK, True)
+
+# for SRC in BUS2:
+#     for SINK in BUS2:
+#         SRC.add_source(SINK, True)
+
+# Build connectivity matrix
+# for SRC in list(BUSs + GENs):
+#     BUSs[0].add_source(SRC, True)
+# for SRC in list(BUSs + BATTERYs + PVs):
+#     BUSs[1].add_source(SRC, True)
+
+# BUILDINGs[0].add_source(BUSs[0], True)
+# BUILDINGs[1].add_source(BUSs[1], True)
+# BUILDINGs[2].add_source(BUSs[1], True)
+# BUILDINGs[3].add_source(BUSs[0], True)
+# BUILDINGs[4].add_source(BUSs[0], True)
+# BATTERYs[0].add_source(BUSs[1], True)
+
+#### Active receivers (initialize nodes for actors actively receiving power from other actors)
+for ACTOR in ACTORS:
+    for SRC in ACTORS:
+        ACTOR.add_active_source(SRC, None)
 
 
 ## ----- Nodes ----- ##
@@ -89,11 +136,11 @@ prob_daily_refueling = Node('prob of daily refueling', 0.25,
 
 ### Grid
 conn_matrix = Node('connectivity matrix', 
-    description='cell ij indicates object[i] receives power from object[j]')
+    description='cell ij indicates actor[i] receives power from actor[j]')
 demand_matrix = Node('demand matrix', 
-    description='desired state for each object on the grid')
+    description='desired state for each actor on the grid')
 state_matrix = Node('state matrix', 
-    description='state from each object on the grid')
+    description='state from each actor on the grid')
 total_load = Node('total_load', description='total power required to run the microgrid')
 islanded_balance = Node('islanded_balance', description='balance of grid sans Utility Grid')
 total_power_balance = Node('total power supplied', 0., 
@@ -101,13 +148,13 @@ total_power_balance = Node('total power supplied', 0.,
 power_wasted = Node('power wasted', 0., 
     description='cumulative power supplied to grid in excess of current demand (W)')
 list_load_shedding = Node('list of load shedding', 
-    description='a list of objects whose loads are removed from the grid')
+    description='a list of actors whose loads are removed from the grid')
 all_loads_shed = Node('all loads shed', 
     description='true if all loads in the graph have been shed (Bool)')
 num_loads = Node('num loads', 
     description='number of loads (buildings) on grid')
 names = Node('names', 
-    description='ordered list of names of objects considered in the model')
+    description='ordered list of names of actors considered in the model')
 
 ### Simulation
 elapsed_hours = Node('elapsed hours', 0, 
@@ -136,6 +183,10 @@ sunlight_filename = Node('sunlight_filename',
     description='filename for sunlight csv file')
 sunlight_data_label = Node('sunlight_data_label', 'SUNY Dir (Wh/m^2)', 
     description='name of column for sunlight data')
+wind_speed = Node('wind_speed', 
+    description='average wind speed over the last hour', units='m/s')
+air_density = Node('air_density', 
+    description='average density of the air', units='kg/m^3')
 load_filename = Node('load filename',
     description='filename for load information')
 batt_trickle = Node('battery trickle charge rate prop', 0.25, 
@@ -145,7 +196,7 @@ next_refuel_hour = Node('next refuel hour', 0,
 
 ### Outputs
 # output_filename = Node('output filename', 'output.txt', description='name of output file')
-# failing_objects = Node('failing_objects', description='list of failing components')
+# failing_actors = Node('failing_actors', description='list of failing components')
 
 
 ## ----- Edges ----- ##
@@ -199,60 +250,60 @@ mg.add_edge([B.name for B in BUILDINGs], num_loads,
 mg.add_edge({'l': list_load_shedding, 'num': num_loads}, all_loads_shed, 
             lambda l, num, **kwargs : len(l) >= num)
 
-### Objects
-mg.add_edge([o.demand for o in OBJECTS if o != UG], islanded_balance, R.Rsum, 
+### Actors
+mg.add_edge([o.demand for o in ACTORS if o not in UGs], islanded_balance, R.Rsum, 
             label='calc_island_balance', edge_props=['LEVEL', 'DISPOSE_ALL'])
-mg.add_edge({o.name for o in OBJECTS}, names, Rsort_names)
+mg.add_edge({o.name for o in ACTORS}, names, Rsort_names)
 keyed_receiving_nodes = {}
-for OBJ in OBJECTS:
+for ACTOR in ACTORS:
     #### Power Flow
-    mg.add_edge({'state': OBJ.state, 'demand': OBJ.demand}, OBJ.is_overloaded, 
+    mg.add_edge({'state': ACTOR.state, 'demand': ACTOR.demand}, ACTOR.is_overloaded, 
                 lambda state, demand, **kwargs : demand > state, 
                 edge_props=['LEVEL', 'DISPOSE_ALL'])
-    # mg.add_edge(OBJ.is_connected, OBJ.demand, lambda **kwargs : 0., via=lambda s1, **kwargs : s1 is False) #TODO: This should be a super node
-    mg.add_edge(OBJ.is_connected, OBJ.state, lambda **kwargs : 0., 
+    # mg.add_edge(ACTOR.is_connected, ACTOR.demand, lambda **kwargs : 0., via=lambda s1, **kwargs : s1 is False) #TODO: This should be a super node
+    mg.add_edge(ACTOR.is_connected, ACTOR.state, lambda **kwargs : 0., 
                 via=lambda s1, **kwargs : s1 is False)
-    mg.add_edge({'x': state_matrix, 'name': OBJ.name, 'names': names}, 
-                OBJ.state, Rget_state_from_matrix, 
-                label=f'retrieve state of {str(OBJ)}', index_offset=1)
-    for SRC in OBJECTS:
-        if SRC is OBJ:
-            mg.add_edge({'receives_from': OBJ.receives_from[str(SRC)], 
-                         'is_conn': OBJ.is_connected}, 
-                        OBJ.receiving_from[str(SRC)], 
+    mg.add_edge({'x': state_matrix, 'name': ACTOR.name, 'names': names}, 
+                ACTOR.state, Rget_state_from_matrix, 
+                label=f'retrieve state of {str(ACTOR)}', index_offset=1)
+    for SRC in ACTORS:
+        if SRC is ACTOR:
+            mg.add_edge({'receives_from': ACTOR.receives_from[str(SRC)], 
+                         'is_conn': ACTOR.is_connected}, 
+                        ACTOR.receiving_from[str(SRC)], 
                         disposable=['is_conn'],
-                        label=f'{str(OBJ)} receiving from itself',
+                        label=f'{str(ACTOR)} receiving from itself',
                         rel=lambda receives_from, is_conn, **kwargs : 
                             receives_from and is_conn)
         else:
-            mg.add_edge({'receives_from': OBJ.receives_from[str(SRC)], 
-                         'receiver_conn': OBJ.is_connected, 
+            mg.add_edge({'receives_from': ACTOR.receives_from[str(SRC)], 
+                         'receiver_conn': ACTOR.is_connected, 
                          'provider_conn': SRC.is_connected}, 
-                        OBJ.receiving_from[str(SRC)], 
+                        ACTOR.receiving_from[str(SRC)], 
                         rel=Rcalc_if_receiving_power, 
-                        label=f'{str(OBJ)} receiving from {str(SRC)}',
+                        label=f'{str(ACTOR)} receiving from {str(SRC)}',
                         disposable=['receiver_conn', 'provider_conn'],
                         index_via=lambda receiver_conn, provider_conn, **kw : 
                                   R.Rsame(receiver_conn, provider_conn))
-        keyed_receiving_nodes.update({generate_connectivity_keyword(OBJ, SRC) : 
-                                      OBJ.receiving_from[str(SRC)]})
+        keyed_receiving_nodes.update({generate_connectivity_keyword(ACTOR, SRC) : 
+                                      ACTOR.receiving_from[str(SRC)]})
 
     #### Failures and Load Shedding
-    mg.add_edge({'is_failing': OBJ.is_failing, 'random_fail': has_random_failure, 
-                 'p': OBJ.prob_failing}, OBJ.is_failing, 
+    mg.add_edge({'is_failing': ACTOR.is_failing, 'random_fail': has_random_failure, 
+                 'p': ACTOR.prob_failing}, ACTOR.is_failing, 
                 rel=lambda p, **kwargs : p > random.random(), index_offset=1,
                 via=lambda random_fail, is_failing, **kwargs : 
                     random_fail is True and is_failing is False)
-    mg.add_edge({'is_failing': OBJ.is_failing, 'p': OBJ.prob_fixed}, OBJ.is_failing, 
+    mg.add_edge({'is_failing': ACTOR.is_failing, 'p': ACTOR.prob_fixed}, ACTOR.is_failing, 
                 rel=lambda p, **kwargs : not (p > random.random()), index_offset=1,
                 via=lambda is_failing, **kwargs : is_failing is True)
     #TODO: Need a way to specify failures of connectivity (like BUS1/BUS2 line)
-    mg.add_edge({'shedding_list': list_load_shedding, 'name': OBJ.name}, 
-                OBJ.is_load_shedding, 
+    mg.add_edge({'shedding_list': list_load_shedding, 'name': ACTOR.name}, 
+                ACTOR.is_load_shedding, 
                 rel=lambda shedding_list, name, **kwargs : name in shedding_list)
-    if OBJ != UG:
-        mg.add_edge({'is_failing': OBJ.is_failing, 'is_load_shedding': OBJ.is_load_shedding}, 
-                    OBJ.is_connected, R.Rnot_any)
+    if ACTOR not in UGs:
+        mg.add_edge({'is_failing': ACTOR.is_failing, 'is_load_shedding': ACTOR.is_load_shedding}, 
+                    ACTOR.is_connected, R.Rnot_any)
 
 mg.add_edge(keyed_receiving_nodes | {'names': names, 'key_sep': key_sep}, conn_matrix, 
             rel=Rform_connectivity_matrix, 
@@ -262,11 +313,11 @@ mg.add_edge(keyed_receiving_nodes | {'names': names, 'key_sep': key_sep}, conn_m
 
 #### Demand matrix
 demand_pairs = {'names': names}
-for i, OBJ in enumerate(OBJECTS):
-    mg.add_edge({'name': OBJ.name, 'demand': OBJ.demand}, OBJ.demand_pair, 
+for i, ACTOR in enumerate(ACTORS):
+    mg.add_edge({'name': ACTOR.name, 'demand': ACTOR.demand}, ACTOR.demand_pair, 
                 rel=lambda name, demand : R.Rtuple(name, demand), 
                 disposable='demand')
-    demand_pairs[f's{i}'] = OBJ.demand_pair
+    demand_pairs[f's{i}'] = ACTOR.demand_pair
 mg.add_edge(demand_pairs, demand_matrix, Rform_demand_matrix, 
             label='form demand matrix', 
             disposable=[key for key in demand_pairs if key != 'names'],
@@ -278,31 +329,42 @@ for BUS in BUSs:
     mg.add_edge(elapsed_hours, BUS.demand, R.Rnull)
 
 ### Utility Grids
-mg.add_edge({'island': island_mode, 'failing': UG.is_failing, 'load_shedding': UG.is_load_shedding}, 
-            UG.is_connected, R.Rnot_any, disposable='failing')
-mg.add_edge({'conn': UG.is_connected, 'load': islanded_balance}, UG.demand, 
-            #TODO: This really should be the load of everything connected to the UG
-            lambda conn, load, **kw : abs(load) if conn else 0., edge_props='LEVEL')
-mg.add_edge(UG.is_connected, is_islanded, 
-            rel=lambda *args, **kwargs : not any(R.extend(args, kwargs)),
-            edge_props=['LEVEL', 'DISPOSE_ALL'])
+for UG in UGs:
+    mg.add_edge({'island': island_mode, 'failing': UG.is_failing, 'load_shedding': UG.is_load_shedding}, 
+                UG.is_connected, R.Rnot_any, disposable='failing')
+    mg.add_edge({'conn': UG.is_connected, 'load': islanded_balance}, UG.demand, 
+                #TODO: This really should be the load of everything connected to the UG
+                lambda conn, load, **kw : abs(load) if conn else 0., edge_props='LEVEL')
+    mg.add_edge(UGs.is_connected, is_islanded, 
+                rel=lambda *args, **kwargs : not any(R.extend(args, kwargs)),
+                edge_props=['LEVEL', 'DISPOSE_ALL'])
 
 ### Solar
 mg.add_edge(year, sunlight_filename, Rget_solar_filename)
 mg.add_edge(sunlight_filename, sunlight_data, Rget_data_from_csv_file)
 mg.add_edge({'csv_data': sunlight_data, 'row': hour_idx, 'col': sunlight_data_label}, 
             sunlight, Rget_float_from_csv_data,
-            index_via=lambda csv_data, row, **kw: R.Rsame(csv_data, row), disposable=['csv_data', 'row'])
+            index_via=lambda csv_data, row, **kw: R.Rsame(csv_data, row), 
+            disposable=['csv_data', 'row'])
 for PV in PVs:
-    mg.add_edge({'conn': PV.is_connected,'area': PV.area, 'efficiency': 
+    mg.add_edge({'conn': PV.is_connected, 'area': PV.area, 'efficiency': 
                  PV.efficiency, 'sunlight': sunlight}, PV.demand, 
-                rel=Rcalc_solar_demand, disposable=['sunlight', 'conn'],
+                rel=Rcalc_solar_demand, 
+                disposable=['sunlight', 'conn'],
                 index_via=lambda conn, sunlight, **kw : R.Rsame(conn, sunlight))
+    
+### Wind
+for W in WINDs:
+    mg.add_edge({'area': W.rotor_area, 'power_coef': W.power_coef, 
+                 'velocity': wind_speed, 'density': air_density}, W.supply, 
+                 rel=Rcalc_wind_supply,
+                 disposable=['velocity', 'density'],
+                 index_via=lambda density, velocity, **kw : R.Rsame(density, velocity))
 
 ### Buildings
 mg.add_edge([B.demand for B in BUILDINGs], total_load, Rdetermine_load, 
             edge_props=['LEVEL', 'DISPOSE_ALL'])
-#TODO: There needs to be a more systematic way of indicating that an object solves for load_shedding.
+#TODO: There needs to be a more systematic way of indicating that an actor solves for load_shedding.
 shedding_nodes = {'balance': total_power_balance, 
                   generate_building_keyword('balance', 'index') : ('balance', 'index')}
 for B in BUILDINGs:
