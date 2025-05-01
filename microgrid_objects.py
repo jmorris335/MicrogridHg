@@ -1,44 +1,108 @@
 from constrainthg import Node
 from enum import Enum, auto
 
-class GridObject:
+class GridActor:
     """An entity on the grid that either receives or supplies power 
     (made of a collection of nodes)."""
     def __init__(self, name: str, **kwargs):
-        self.name = Node(f'name_{name}', name, description='name of object')
-        self.is_connected = Node(f'is_connected_{name}', 
-            kwargs.get('is_connected', None), description='object is connected to grid')
-        self.is_failing = Node(f'is_failing{name}',
-            kwargs.get('is_failing', False), description='object is failing')
-        self.prob_failing = Node(f'prob_failing{name}', 
-            kwargs.get('prob_failing', 0.), description='probability of object failing')
-        self.prob_fixed = Node(f'prob_fixed{name}', 
+        self.name = Node(
+            f'name_{name}', 
+            name, 
+            description='name of object'
+        )
+        self.is_connected = Node(
+            f'is_connected_{name}', 
+            kwargs.get('is_connected', None), 
+            description='object is connected to grid'
+        )
+        self.is_failing = Node(
+            f'is_failing{name}',
+            kwargs.get('is_failing', False), 
+            description='object is failing'
+        )
+        self.prob_failing = Node(
+            f'prob_failing{name}', 
+            kwargs.get('prob_failing', 0.), 
+            description='probability of object failing'
+        )
+        self.prob_fixed = Node(
+            f'prob_fixed{name}', 
             kwargs.get('prob_fixed', 0.5), 
-            description='probability of failing object getting fixed')
-        self.is_overloaded = Node(f'is_overloaded_{name}', 
+            description='probability of failing object getting fixed'
+        )
+        self.is_overloaded = Node(
+            f'is_overloaded_{name}', 
             kwargs.get('is_overloaded', None), 
-            description='more power is being demanded of an object than can be supplied')
-        self.is_load_shedding = Node(f'{name} is load shedding', 
+            description='more power is being demanded of an object than can be supplied'
+        )
+        self.is_load_shedding = Node(
+            f'{name} is load shedding', 
             kwargs.get('is_load_shedding', False),
-            description='true if the object is deliberately disconnected from the grid')
-        self.demand = Node(f'demand_{name}', kwargs.get('demand', None), 
-            description='load of object demanded from (-) or providing to (+) the grid', units='W')
-        self.state = Node(f'state_{name}', kwargs.get('state', None), 
-            description='amount of power actively receiving (-) or providing (+)', units='W')
-        self.receives_from = {name: Node(f'{name} receives from itself', True, 
-            description=f'{name} receives power from itself (trivial)')}
+            description='true if the object is deliberately disconnected from the grid'
+        )
+        self.demand = Node(
+            f'demand_{name}', 
+            kwargs.get('demand', None), 
+            description='load of object demanded from (-) or providing to (+) the grid',
+            units='W'
+        )
+        self.state = Node(
+            f'state_{name}', 
+            kwargs.get('state', None), 
+            description='amount of power actively receiving (-) or providing (+)',
+            units='W'
+        )
+        self.receives_from = {name: Node(
+            f'{name} receives from itself', 
+            True, 
+            description=f'{name} receives power from itself (trivial)'
+        )}
         for source, val in dict(kwargs.get('receives_from', {})).items():
             self.add_source(source, val)
         self.receiving_from = {}
         for source, val in dict(kwargs.get('receiving_from', {})).items():
             self.add_active_source(source, val)
-        demand = kwargs.get('demand', None) 
-        self.demand_pair = Node(f'demand_pair_{name}', None, 
-                                description='keyed connection to demand')
+
+        self.demand_pair = Node(
+            f'demand_pair_{name}',
+            description='keyed connection to demand'
+        )
 
         # HACK: This node receives no default value (as it should, given below) because right now the microgrid resolves for input nodes.
         # self.demand_pair = Node(f'demand_pair_{name}', None if demand is None else (name, demand), 
         #                             description='keyed connection to demand')
+
+        # Added points for new power distribution strategy
+        self.benefit = Node(
+            f'benefit_{name}',
+            kwargs.get('benefit', None),
+            description=f'Benefit of meeting {name}\'s demand',
+            units='$/W'
+        )
+        self.cost = Node(
+            f'cost_{name}',
+            kwargs.get('cost', None),
+            description=f'Cost of generating {name}\'s supply',
+            units='$/W'
+        )
+        self.req_demand = Node(
+            f'req_demand_{name}',
+            kwargs.get('req_demand', None),
+            description=f'Minimum load required for the actor to operate',
+            units='W'
+        )
+        self.max_demand = Node(
+            f'max_demand_{name}',
+            kwargs.get('max_demand', None),
+            description=f'Maximum load that the actor can receive',
+            units='W'
+        )
+        self.supply = Node(
+            f'supply_{name}',
+            kwargs.get('supply', None),
+            description=f'Current energy that the actor can supply',
+            units='W'
+        )
     
     def add_source(self, source, val: bool=True):
         """Creates a node indicating that the source GridObject is wired 
@@ -58,7 +122,7 @@ class GridObject:
         """Returns the name of the GridObject."""
         return self.name.static_value
 
-class Generator(GridObject):
+class Generator(GridActor):
     """A grid object that can only supply power converted from some type 
     of fuel."""
     def __init__(self, name: str, fuel_capacity: float, starting_fuel_level: float, 
@@ -77,7 +141,7 @@ class Generator(GridObject):
             description='generator is out of fuel')
         super().__init__(name, **kwargs)
     
-class Battery(GridObject):
+class Battery(GridActor):
     """A grid object that can supply power or receive power for later 
     distribution."""
     def __init__(self, name: str, charge_level: float, charge_capacity: float, max_output: float, 
@@ -98,7 +162,7 @@ class Battery(GridObject):
             description='true if battery is set for charging')
         super().__init__(name, **kwargs)
 
-class PhotovoltaicArray(GridObject):
+class PhotovoltaicArray(GridActor):
     """A grid object that distributes power converted from solar energy."""
     def __init__(self, name: str, area: float, efficiency: float, **kwargs):
         self.area = Node(f'area_{name}', area, 
@@ -114,7 +178,7 @@ class BUILDING_TYPE(Enum):
     LARGE = 'LargeOffice'
     WAREHOUSE = 'Warehouse'
 
-class Building(GridObject):
+class Building(GridActor):
     """A grid object with a determined load."""
     def __init__(self, name: str, type: BUILDING_TYPE, **kwargs):
         self.type = Node(f'type_{name}', type, description='type of building')

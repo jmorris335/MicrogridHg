@@ -16,7 +16,7 @@ def generate_connectivity_keyword(OBJ_to, OBJ_from):
     keyword = f'{name_to}{KEY_SEP}{name_from}'
     return keyword
 
-def generate_building_keyword(building: GridObject, keyword: str):
+def generate_building_keyword(building: GridActor, keyword: str):
     """Generates a keyword for referencing the value of the building."""
     key = f'{keyword}{KEY_SEP}{str(building)}'
     return key
@@ -348,7 +348,7 @@ def Rmake_state_vector(conn: list, names: list, tol: float,
         Must contain n source tuples and n demand tuples keyed with a 
         keyword containing either ``source_tuples`` or ``demand_tuples`` 
         respectively. Source tuples are of the format ``(label, cost, 
-        supply)``, while demand tuples should follow ``(label, priority, 
+        supply)``, while demand tuples should follow ``(label, benefit, 
         req_demand, max_demand)``, with the label corresponding to the 
         name in ``names``.
 
@@ -459,11 +459,11 @@ def can_send_to(src, sink, conn: list, visited: set=None):
 
 def make_demand_queue(*args, **kwargs):
     """Compiles the demand queue from the demand tuples, sorted by 
-    priority. Queue is compiled from tuples passed to *args or **kwargs 
-    of the following form: ``(label, priority, req_demand, max_demand)``
+    benefit. Queue is compiled from tuples passed to *args or **kwargs 
+    of the following form: ``(label, benefit, req_demand, max_demand)``
 
     *Note: Future versions may update the sorting scheme from a linear 
-    sort based on maximum priority (current version) to something that 
+    sort based on maximum benefit (current version) to something that 
     considers the efficiency of the load.*
     """
     args = R.extend(args, kwargs)
@@ -521,14 +521,14 @@ def meet_req_demands(demand_q: list, supply_q: list, states: dict, tol: float,
     the supply is exhuasted.
     """
     s_label, cost, supply = supply_q[s_idx]
-    d_label, priority, req_d, _ = demand_q[d_idx]
+    d_label, benefit, req_d, _ = demand_q[d_idx]
 
     unused_s = supply if current_supply is None else current_supply
     unmet_d = req_d
     current_suppliers, keyframe_s_idx, keyframe_supply = {}, s_idx, unused_s
     
     try:
-        while priority >= cost:
+        while benefit >= cost:
             while (unused_s < tol or 
                    actor_is_receiving(s_label, states)):
                 s_label, cost, supply = supply_q[s_idx := s_idx + 1]
@@ -537,7 +537,7 @@ def meet_req_demands(demand_q: list, supply_q: list, states: dict, tol: float,
             while any((unmet_d < tol, d_label in states, 
                        d_label == s_label, 
                        actor_is_supplying(d_label, states))):
-                d_label, priority, req_d, _ = demand_q[d_idx := d_idx + 1]
+                d_label, benefit, req_d, _ = demand_q[d_idx := d_idx + 1]
                 unmet_d = req_d
             
             unmet_d, unused_s = meet_actor_demand(unmet_d, unused_s)
@@ -567,13 +567,13 @@ def meet_max_demands(demand_q: list, supply_q: list, states: dict,
         The updated states in ``{name : state}`` format.
     """
     s_label, cost, supply = supply_q[s_idx]
-    d_label, priority, req_d, max_d = demand_q[d_idx]
+    d_label, benefit, req_d, max_d = demand_q[d_idx]
 
     unused_s = supply if current_supply is None else current_supply
     unmet_d = max_d - req_d
 
     try:
-        while priority >= cost:
+        while benefit >= cost:
             while unused_s < tol or actor_is_receiving(s_label, states):
                 s_label, cost, supply = supply_q[s_idx := s_idx + 1]
                 unused_s = supply
@@ -581,7 +581,7 @@ def meet_max_demands(demand_q: list, supply_q: list, states: dict,
             while any((unmet_d < tol, 
                        actor_is_supplying(d_label, states), 
                        d_label == s_label)):
-                d_label, priority, req_d, max_d = demand_q[d_idx := d_idx + 1]
+                d_label, benefit, req_d, max_d = demand_q[d_idx := d_idx + 1]
                 unmet_d = max_d - req_d
 
             unmet_d, unused_s = meet_actor_demand(unmet_d, unused_s)

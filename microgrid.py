@@ -14,10 +14,10 @@ mg = Hypergraph(no_weights=True)
 
 ## ----- Objects ----- ##
 ### Initialize Objects
-UG = GridObject('UtilityGrid', is_load_shedding=False)
+UG = GridActor('UtilityGrid', is_load_shedding=False)
 BUSs = [
-    GridObject('Bus1'),
-    GridObject('Bus2'),
+    GridActor('Bus1'),
+    GridActor('Bus2'),
 ]
 PVs = [
     PhotovoltaicArray('PV1', area=10000, efficiency=.18)
