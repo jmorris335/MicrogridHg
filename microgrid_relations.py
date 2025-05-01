@@ -327,3 +327,282 @@ def Rcalc_battery_charge_level(state: float, level: float, max_level: float,
     expected_level = level + (eff * state)
     new_level = max(0, min(expected_level, max_level))
     return new_level
+
+
+## Power distribution strategy
+def Rmake_state_vector(conn: list, names: list, tol: float, 
+                       *args, **kwargs)->list:
+    """Determines the state for each object on the grid.
+
+    Parameters
+    ----------
+    conn : List[List] | Dict[List] | Dict[Dict]
+        A nxn boolean matrix where each entry describes whether the ith 
+        element can send power to the jth element.
+    names : list
+        List of n ordered labels of actors on the grid corresponding 
+        both the rows and columns of ``conn``.
+    tol : float
+        Minimum value used for floating point comparisons with zero.
+    \**kwargs : dict
+        Must contain n source tuples and n demand tuples keyed with a 
+        keyword containing either ``source_tuples`` or ``demand_tuples`` 
+        respectively. Source tuples are of the format ``(label, cost, 
+        supply)``, while demand tuples should follow ``(label, priority, 
+        req_demand, max_demand)``, with the label corresponding to the 
+        name in ``names``.
+
+    Process
+    -------
+    1. Use connectivity matrix to determine connected circuits.
+    2. Generate a supply queue and demand queue from each circuit based 
+    on the cost and profits (respectively) from each actor in the circuit.
+    3. Create a state vector for each circuit, based on the power 
+    distribution strategy.
+    4. Concantenate the individual state vectors from each circuit to 
+    represent the entire grid.
+    5. Set any remaining unknown states to zero.
+
+    Notes
+    -----
+    The power distribution strategy cannot account for non-independent 
+    grid circuit, and will default to skipping the smallest dependent 
+    circuit encountered. A set of dependent circuits are circuits that 
+    each contain the same grid actor(s). In this case, the distribution 
+    strategy will produce conflicting states for the shared actors, so 
+    the default behavior is to take the most viable strategy (affecting 
+    the most nodes) and neglecting the other circuits (setting them to 
+    zero). This will effectively disconnect actors that are only 
+    connected to a neglected circuit to prevent them from being set to a
+    conflicting state.
+    """
+    supply_tuples, demand_tuples, states = [], [], {}
+    for key, val in kwargs.items():
+        if 'supply_tuple' in key.lower():
+            supply_tuples.append(val)
+        elif 'demand_tuple' in key.lower():
+            demand_tuples.append(val)
+
+    circuits = get_circuits(conn, names)
+    circuits.sort(key=lambda c : sum([len(a) for a in c]), reverse=True)
+    for suppliers, demanders in circuits:
+        ind_suppliers = set(suppliers).difference(states.keys())
+        ind_demanders = set(demanders).difference(states.keys())
+        if len(ind_suppliers) != len(suppliers) or len(ind_demanders) != len(demanders):
+            msg = 'Non-independent grid circuit encountered.'
+            msg += 'Repeated actors may not be optimally considered by power distribution strategy.'
+            msg += f'\n - Repeated actors: {[a for a in suppliers + demanders if a in states]}'
+            logging.warning(msg)
+
+        sts_filtered = [st for st in supply_tuples if st[0] in ind_suppliers]
+        dts_filtered = [dt for dt in demand_tuples if dt[0] in ind_demanders]
+        supply_queue = make_supply_queue(*sts_filtered)
+        demand_queue = make_demand_queue(*dts_filtered)
+        found_states = meet_circuit_demand(demand_queue, supply_queue, tol, names)
+        if any([fs in states for fs in found_states]):
+            msg = 'Non-independent grid circuit neglected: power distribution ' \
+            'strategy may be faulty and some actors\' state set to 0.'
+            msg += f'\n - Repeated actors: {[fs for fs in found_states if fs in states]}'
+            msg += f'\n - Possibly lost actors: {[fs for fs in found_states if fs not in states]}'
+            logging.warning(msg)
+            continue
+        states = states | found_states
+    
+    state_list = [states.get(name, 0.) for name in names]
+    return state_list
+
+def get_circuits(conn: list, names: list)->list:
+    """Parses a connectivity matrix and returns a list of 2 list pairs 
+    (tuples) representing the supplying and demanding actors in a 
+    connected circuit.
+
+    Actors that give power to another actor can form the supply list, 
+    while actors that receive power from another actor go to demand list. 
+    The method produces pairs such that every actor in the demand list 
+    is capable of receiving energy from any actor in the supply list.
+    """
+    circuits, n = [], len(conn)
+    conns = {src : {sink for sink in range(n) 
+                    if can_send_to(src, sink, conn)} for src in range(n)}
+
+    for src, sinks in conns.items():
+        if len(sinks) == 0:
+            continue
+        for suppliers, demanders in circuits:
+            if all([d in sinks for d in demanders]):
+                suppliers.add(src)
+        if sinks not in [c[1] for c in circuits]:
+            circuits.append(({src}, sinks))
+
+    circuits = [tuple([names[a] for a in s] for s in c) for c in circuits]
+
+    return circuits
+
+def can_send_to(src, sink, conn: list, visited: set=None):
+    """Returns true if the source is able to send power to the sink. 
+    ``conn`` is a list (or dict) of lists, where the keyword is an actor 
+    and the value is a list of actors the key actor can send power to."""
+    if visited is None:
+        visited = set()
+
+    labels = conn.keys() if conn is dict else range(len(conn))
+
+    direct_sinks = {d_sink for d_sink in labels if conn[src][d_sink]}
+    direct_sinks = direct_sinks.difference(visited)
+
+    if sink in direct_sinks:
+        return True
+    else:
+        visited.add(src)
+        return any([can_send_to(new_src, sink, conn, visited) 
+                    for new_src in direct_sinks])
+
+def make_demand_queue(*args, **kwargs):
+    """Compiles the demand queue from the demand tuples, sorted by 
+    priority. Queue is compiled from tuples passed to *args or **kwargs 
+    of the following form: ``(label, priority, req_demand, max_demand)``
+
+    *Note: Future versions may update the sorting scheme from a linear 
+    sort based on maximum priority (current version) to something that 
+    considers the efficiency of the load.*
+    """
+    args = R.extend(args, kwargs)
+    demand_queue = [val for val in args 
+                    if isinstance(val, tuple) and len(val) == 4]
+    demand_queue.sort(key=lambda a : a[1], reverse=True)
+    return demand_queue
+
+def make_supply_queue(*args, **kwargs):
+    """Compiles the supply queue from the supply tuples, sorted by cost. 
+    Queue is compiled from tuples passed to *args or **kwargs of the 
+    following form: ``(label, cost, supply)``
+    """
+    args = R.extend(args, kwargs)
+    supply_queue = [val for val in args 
+                    if isinstance(val, tuple) and len(val) == 3]
+    supply_queue.sort(key=lambda a : a[1])
+    return supply_queue
+
+def meet_circuit_demand(demand_queue: list, supply_queue: list, tol: float):
+    """Returns a dict of grid states derived from logic on how to 
+    prioritize meeting the demands of the grid."""
+    states = {}
+    if len(demand_queue) == 0 or len(supply_queue) == 0:
+        return {}
+    
+    states, s_idx, unused_s = meet_req_demands(demand_queue, supply_queue, states, tol)
+    states = meet_max_demands(demand_queue, supply_queue, states, tol, unused_s, s_idx=s_idx)
+
+    return states
+
+def meet_req_demands(demand_q: list, supply_q: list, states: dict, tol: float, 
+                     current_supply: float=None, s_idx: int=0, d_idx: int=0)-> tuple:
+    """Balances the supplied power to strategically meet the provided 
+    grid demands.
+
+    Returns
+    -------
+    out : tuple
+        A tuple containing the following values:
+
+        - dict: A dictionary of assigned states following 
+        ``{label:state}`` format.
+        - int: Index of latest used supplying actor that still has power 
+        that can be provided.
+        - float: Amount of remaining power for the actor at the given 
+        index.
+
+    Process
+    -------
+    Takes the top element of the demand and supply queue and matches them
+    against each other. If an actor's required demand cannot be met by 
+    the grid, then the actor is dropped and the index resets to its 
+    previous state. This proceeds until either all demands are met or 
+    the supply is exhuasted.
+    """
+    s_label, cost, supply = supply_q[s_idx]
+    d_label, priority, req_d, _ = demand_q[d_idx]
+
+    unused_s = supply if current_supply is None else current_supply
+    unmet_d = req_d
+    current_suppliers, keyframe_s_idx, keyframe_supply = {}, s_idx, unused_s
+    
+    try:
+        while priority >= cost:
+            while (unused_s < tol or 
+                   actor_is_receiving(s_label, states)):
+                s_label, cost, supply = supply_q[s_idx := s_idx + 1]
+                unused_s = supply
+
+            while any((unmet_d < tol, d_label in states, 
+                       d_label == s_label, 
+                       actor_is_supplying(d_label, states))):
+                d_label, priority, req_d, _ = demand_q[d_idx := d_idx + 1]
+                unmet_d = req_d
+            
+            unmet_d, unused_s = meet_actor_demand(unmet_d, unused_s)
+            current_suppliers[s_label] = abs(supply - unused_s)
+            if unmet_d < tol: 
+                states[d_label] = -abs(req_d)
+                states = states | current_suppliers
+                current_suppliers, keyframe_s_idx, keyframe_supply = {}, s_idx, unused_s
+    except: IndexError
+
+    if len(current_suppliers) > 0 and d_idx < len(demand_q) - 1:
+        states, s_idx, unused_s = meet_req_demands(demand_q, supply_q, states, 
+                                  tol, d_idx=d_idx+1,
+                                  s_idx=keyframe_s_idx, current_supply=keyframe_supply)
+        
+    return states, s_idx, unused_s
+
+def meet_max_demands(demand_q: list, supply_q: list, states: dict, 
+                     tol: float, current_supply: float=None, 
+                     d_idx: int=0, s_idx: int=0)-> dict:
+    """Iterates through the suppliers to meet the maximum amount of 
+    maximum demands for the receiving actors.
+    
+    Returns
+    -------
+    out : dict
+        The updated states in ``{name : state}`` format.
+    """
+    s_label, cost, supply = supply_q[s_idx]
+    d_label, priority, req_d, max_d = demand_q[d_idx]
+
+    unused_s = supply if current_supply is None else current_supply
+    unmet_d = max_d - req_d
+
+    try:
+        while priority >= cost:
+            while unused_s < tol or actor_is_receiving(s_label, states):
+                s_label, cost, supply = supply_q[s_idx := s_idx + 1]
+                unused_s = supply
+
+            while any((unmet_d < tol, 
+                       actor_is_supplying(d_label, states), 
+                       d_label == s_label)):
+                d_label, priority, req_d, max_d = demand_q[d_idx := d_idx + 1]
+                unmet_d = max_d - req_d
+
+            unmet_d, unused_s = meet_actor_demand(unmet_d, unused_s)
+            states[s_label] = abs(supply - unused_s)
+            states[d_label] = -abs(max_d - unmet_d)
+    except: IndexError
+
+    return states
+
+def actor_is_supplying(label: str, grid_states: dict)-> bool:
+    """Returns True if the given actor is listed as supplying power."""
+    return grid_states.get(label, float('-inf')) > 0
+
+def actor_is_receiving(label: str, grid_states: dict)-> bool:
+    """Returns True if given actor is listed as receiving power."""
+    return grid_states.get(label, float('inf')) < 0
+
+def meet_actor_demand(demand: float, supply: float)-> tuple:
+    """Matches the maximum amount of demand that can be met by the given
+    supply."""
+    diff = demand - supply
+    demand_out = max(0., diff)
+    supply_out = max(0., -diff)
+    return demand_out, supply_out
