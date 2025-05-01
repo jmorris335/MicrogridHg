@@ -2,6 +2,7 @@ import constrainthg.relations as R
 import random
 import csv
 import numpy as np
+import logging
 
 from microgrid_objects import *
 
@@ -9,7 +10,8 @@ from microgrid_objects import *
 KEY_SEP = '¦&¦' #A unique constant for seperating strings in paired keywordss
 
 def generate_connectivity_keyword(OBJ_to, OBJ_from):
-    """Generates a keyword for referencing the cell connecting OBJ_from to OBJ_to."""
+    """Generates a keyword for referencing the cell connecting OBJ_from 
+    to OBJ_to."""
     name_to, name_from = [str(OBJ) for OBJ in (OBJ_to, OBJ_from)]
     keyword = f'{name_to}{KEY_SEP}{name_from}'
     return keyword
@@ -19,8 +21,8 @@ def generate_building_keyword(building: GridObject, keyword: str):
     key = f'{keyword}{KEY_SEP}{str(building)}'
     return key
 
-## ----- Relationships ----- ##
-### Simulation
+
+## Simulation
 def Rget_random_year(min_year: int, max_year: int, **kwargs):
     """Returns a random year from the maximum range."""
     rand_year = random.randint(int(min_year), int(max_year))
@@ -63,7 +65,8 @@ def Rcalc_hour(elapsed_hours: int, start_hour: int, hours_in_day: int, **kwargs)
 
 def Rcalc_num_leapyears(start_year: int, elapsed_hours: int, 
                         hours_in_year: int, hours_in_leapyear: int, **kwargs)-> int:
-    """Returns the number of leapyears that the simulation has covered (not counting the present year)."""
+    """Returns the number of leapyears that the simulation has covered 
+    (not counting the present year)."""
     num_leapyears = 0
     year = start_year
     while elapsed_hours > 0:
@@ -75,7 +78,8 @@ def Rcalc_num_leapyears(start_year: int, elapsed_hours: int,
 
 def Rget_hour_index(day: int, hour: int, is_leapyear: bool, hours_in_day: int, 
                     hours_in_year: int, hours_in_leapyear: int, **kwargs):
-    """Converts the day and hour into a integer for the hour of the year (1-8784)"""
+    """Converts the day and hour into a integer for the hour of the year 
+    (1-8784)"""
     max_h_i = hours_in_leapyear if is_leapyear else hours_in_year
     hour_idx = max(0, min(int(day * hours_in_day + hour), max_h_i))
     return hour_idx
@@ -84,6 +88,7 @@ def Rcalc_year_is_leapyear(year: int, **kwargs)-> bool:
     """Returns true if the year is a leapyear."""
     is_leapyear = year % 4 == 0
     return is_leapyear
+
 
 ### Data
 def Rget_data_from_csv_file(filename: str, **kwargs):
@@ -104,6 +109,7 @@ def Rget_load_from_building_data(csv_data: dict, row, col, **kwargs):
     value *= 1000 #convert from kW to W
     return value
 
+
 ## Microgrid
 def Rsort_names(*args, **kwargs)->list:
     """Sorts the object names into a prefered list."""
@@ -114,7 +120,9 @@ def Rsort_names(*args, **kwargs)->list:
 def Rdetermine_load(*args, **kwargs)->float:
     """Determines the amount of energy necessary to run the microgrid.
     
-    Note output is always negative or zero, since loads are always negative."""
+    Note output is always negative or zero, since loads are always 
+    negative.
+    """
     demands = R.extend(args, kwargs)
     load = -sum([abs(d) for d in demands if d < 0.])
     return load
@@ -123,12 +131,15 @@ def Rdetermine_if_connected(is_failing: bool, is_load_shedding: bool, **kwargs)-
     """Determines whether or not the object is connected to the grid."""
     return not (is_failing or is_load_shedding)
 
-def Rcalc_if_receiving_power(receives_from: bool, receiver_conn: bool, provider_conn: bool, **kwargs)-> bool:
-    """Determines if the receiver object is receiving power from the provider object."""
+def Rcalc_if_receiving_power(receives_from: bool, receiver_conn: bool, 
+                             provider_conn: bool, **kwargs)-> bool:
+    """Determines if the receiver object is receiving power from the 
+    provider object."""
     return receives_from and receiver_conn and provider_conn
 
 def Rform_connectivity_matrix(names: list, key_sep: str, *args, **kwargs)-> np.ndarray:
-    """Forms the connectivity (A) matrix where the ij-th cell indicates power is flowing from object j to object i."""
+    """Forms the connectivity (A) matrix where the ij-th cell indicates 
+    power is flowing from object j to object i."""
     A = np.zeros((len(names), len(names)))
     # args, kwargs = R.get_keyword_arguments(args, kwargs, KEYNAMES)
     for key, val in kwargs.items():
@@ -138,7 +149,8 @@ def Rform_connectivity_matrix(names: list, key_sep: str, *args, **kwargs)-> np.n
     return A
 
 def Rform_demand_matrix(**kwargs)-> np.ndarray:
-    """Forms the demand (B) matrix where the i-th cell indicates the demand for object i."""
+    """Forms the demand (B) matrix where the i-th cell indicates the 
+    demand for object i."""
     names = kwargs.get('names')
     demands = {}
     for value in kwargs.values():
@@ -160,17 +172,21 @@ def Rlinear_solve(A: np.ndarray, B: np.ndarray, **kwargs)-> np.ndarray:
     return x
 
 def Rdetermine_load_shedding(names: list, balance: float, key_sep: str, **kwargs)-> list:
-    """Returns a list of buildings that are being load shed.
+    """Returns a list of objects that are being load shed.
     
     Parameters
     ----------
-    - `balance` : float
-        the total system balance
-    - `load` & OBJ : str (split by `key_sep`)
-        load of the object 
-    - `priority` & OBJ : str (split by `key_sep`)
-        priority rating of the object
-    - `key_sep` : str for splitting `load` and `priority`
+    names : list
+        Ordered list of objects.
+    balance : float
+        The total system balance.
+    key_sep : str 
+        String splitting `load` and `priority`.
+    \**kwargs : dict
+        - load *(& OBJ)* : str
+            Load of the object split by `key_sep`.
+        - priority *(& OBJ)* : str
+            Priority rating of the object split by `key_sep`.
     """
     keyed_args = {}
     for key, val in kwargs.items():
@@ -180,7 +196,8 @@ def Rdetermine_load_shedding(names: list, balance: float, key_sep: str, **kwargs
             keyed_args[OBJ] = {}
         keyed_args[OBJ].update({var: val})
 
-    vals = [(OBJ, keyed_args[OBJ]['load'], keyed_args[OBJ]['priority']) for OBJ in keyed_args]
+    vals = [(OBJ, keyed_args[OBJ]['load'], keyed_args[OBJ]['priority']) 
+            for OBJ in keyed_args]
     vals.sort(key=lambda a : a[-1])
 
     to_shed = []
@@ -193,19 +210,24 @@ def Rdetermine_load_shedding(names: list, balance: float, key_sep: str, **kwargs
 
 def Vload_nodes_are_level(key_sep: str, **kwargs)-> bool:
     """Returns true if all the indices for the load nodes are the same."""
-    load_node_indices = {kwargs[kw] for kw in kwargs if kw.split(key_sep)[0] == 'index'}
+    load_node_indices = {kwargs[kw] for kw in kwargs 
+                         if kw.split(key_sep)[0] == 'index'}
     return len(load_node_indices) == 1
+
 
 ## Utility Grid
 def Rcalc_ug_demand(conn: bool, islanded_balance: float, *args, **kwargs)-> float:
-    """Calculates the demand of the utility grid based off of current balance."""
+    """Calculates the demand of the utility grid based off of current 
+    balance."""
     if not conn or islanded_balance > 0.:
         return 0.
     return abs(islanded_balance)
 
+
 ## Solar
 def Rget_solar_filename(year: str, **kwargs)-> str:
-    """Returns the name of the CSV file with the solar data corresponding to the given year."""
+    """Returns the name of the CSV file with the solar data 
+    corresponding to the given year."""
     out = 'solar_data/724915'
     if year == 0 or str(year).upper() == 'TY':
         out += 'TY'
@@ -214,25 +236,30 @@ def Rget_solar_filename(year: str, **kwargs)-> str:
     out += '.csv'
     return out
 
-def Rcalc_solar_demand(conn: bool, area: float, efficiency: float, sunlight: float, **kwargs)-> float:
-    """Calculates the power (in W) produced by a photovoltaic cell for one hour."""
+def Rcalc_solar_demand(conn: bool, area: float, efficiency: float, 
+                       sunlight: float, **kwargs)-> float:
+    """Calculates the power (in W) produced by a photovoltaic cell over one hour."""
     if not conn:
         return 0.0
     power = max(0, area * efficiency * sunlight / 1000)
     return power
 
+
 ## Buildings
 def Rget_building_filename(building_type: BUILDING_TYPE, **kwargs)-> str:
-    """Returns the name of the CSV file with the load data corresponding to the building type."""
+    """Returns the name of the CSV file with the load data corresponding to the 
+    building type."""
     out = f'building_data/RefBldg{building_type.value}New2004_7-1_5-0_3C_USA_CA_SAN_FRANCISCO.csv'
     return out
 
 def Rcalc_critical_load(lights: float, equipment: float, **kwargs)-> float:
-    """Calculates the critical load for a building based on its light and equipment usage."""
+    """Calculates the critical load for a building based on its light 
+    and equipment usage."""
     cl = 0.5 * lights + 0.67 * equipment
     return cl
 
-def Rdetermine_building_load(conn: bool, normal: float, critical: float, island: bool, **kwargs)-> float:
+def Rdetermine_building_load(conn: bool, normal: float, critical: float, 
+                             island: bool, **kwargs)-> float:
     """Determines the load of a building."""
     if not conn:
         return 0.0
@@ -240,14 +267,17 @@ def Rdetermine_building_load(conn: bool, normal: float, critical: float, island:
     load = -load
     return load
 
+
 ## Generators
-def Rcalc_generator_demand(is_islanded: bool, load: float, max_out: float, out_of_fuel: bool, conn: bool, **kwargs)-> float:
+def Rcalc_generator_demand(is_islanded: bool, load: float, max_out: float, 
+                           out_of_fuel: bool, conn: bool, **kwargs)-> float:
     """Calculates how much power the generator is capable of supplying."""
     if any([not conn, not is_islanded, out_of_fuel]):
         return 0.
     return max(0., min(abs(load), max_out))
 
-def Rcalc_next_time_for_refueling(refuel_time: int, curr_hour: int, prob: float, hours_in_day: int, **kwargs):
+def Rcalc_next_time_for_refueling(refuel_time: int, curr_hour: int, 
+                                  prob: float, hours_in_day: int, **kwargs):
     """Calculates the next time for refueling based on the current time."""
     if refuel_time > curr_hour:
         return refuel_time
@@ -258,17 +288,20 @@ def Rcalc_next_time_for_refueling(refuel_time: int, curr_hour: int, prob: float,
     next_time = refuel_time + days_until_refuel * hours_in_day + hours_until_refuel
     return next_time
 
-def Rcalc_generator_fuel_level(refuel_time: int, curr_hour: int, curr_level: float, max_level: float, **kwargs)-> float:
+def Rcalc_generator_fuel_level(refuel_time: int, curr_hour: int, curr_level: float, 
+                               max_level: float, **kwargs)-> float:
     """Determines the fuel level of the generator."""
     if refuel_time > curr_hour:
         return curr_level
     return max_level
 
+
 ## Batteries
-def Rcalc_battery_demand(is_charging: bool, load: float, level: float, capacity: float, max_rate: float, 
+def Rcalc_battery_demand(island: bool, is_charging: bool, load: float, 
+                         level: float, capacity: float, max_rate: float, 
                          max_output: float, trickle_prop: float, **kwargs)-> float:
     """Calculates the demand of the battery."""
-    if load < 0:
+    if load < 0 and not island:
         highest_output = min(max_output, level)
         demand = max(0, min(abs(load), highest_output))
     elif is_charging:
@@ -276,17 +309,20 @@ def Rcalc_battery_demand(is_charging: bool, load: float, level: float, capacity:
             demand = trickle_prop * max_rate
         else:
             demand = max_rate
+        demand = -demand
     else:
         demand = 0
     return demand
 
-def Rdetermine_battery_is_charging(island: bool, load: float, level: float, capacity: float, all_loads_shed: bool, **kwargs)-> bool:
+def Rdetermine_battery_is_charging(island: bool, load: float, level: float, 
+                                   capacity: float, **kwargs)-> bool:
     """Determines if the battery should be charging or not."""
-    if not island or load < 0 or all_loads_shed:
+    if not island or load < 0:
         return False
     return level < capacity
 
-def Rcalc_battery_charge_level(state: float, level: float, max_level: float, eff: float, **kwargs)-> float:
+def Rcalc_battery_charge_level(state: float, level: float, max_level: float, 
+                               eff: float, **kwargs)-> float:
     """Calculates the charge level of the battery based on power flow (W)."""
     expected_level = level + (eff * state)
     new_level = max(0, min(expected_level, max_level))
