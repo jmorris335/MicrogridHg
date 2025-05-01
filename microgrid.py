@@ -25,13 +25,14 @@ UGs = [
     )
 ]
 BUSs = [
-    GridActor('Bus1'),
-    GridActor('Bus2'),
+    Bus('Bus1'),
+    Bus('Bus2'),
 ]
 PVs = [
     PhotovoltaicArray('PV1', 
                       area=10000,
-                      efficiency=.18
+                      efficiency=.18,
+                      cost=0.02,
     )
 ]
 WINDs = []
@@ -39,23 +40,26 @@ GENs = [
     Generator('Generator1', 
               fuel_capacity=2500., 
               starting_fuel_level=2500., 
-              max_output=30000., 
-              efficiency=0.769
+              max_output=30., 
+              efficiency=0.769,
+              cost=10.,
     ), 
     Generator('Generator2', 
               fuel_capacity=2500., 
               starting_fuel_level=2500., 
-              max_output=30000., 
-              efficiency=0.769
+              max_output=100., 
+              efficiency=0.769,
+              cost=25.,
     ), 
 ]
 BATTERYs = [
     Battery('Battery1', 
             charge_capacity=10000.,
             charge_level=10000., 
-            max_output=100000.,
+            max_output=100.,
             efficiency=0.9747,
-            max_charge_rate=2000.
+            max_charge_rate=2.,
+            scarcity_factor=1.5,
     ),
 ]
 BUILDINGs = [
@@ -202,79 +206,163 @@ next_refuel_hour = Node('next refuel hour', 0,
 ## ----- Edges ----- ##
 ### Simulation
 mg.add_edge(days_in_year, days_in_leapyear, lambda s1, **kw : s1 + 1)
-mg.add_edge({'days':days_in_year, 'hours':hours_in_day}, hours_in_year, R.Rmultiply)
-mg.add_edge({'days':days_in_leapyear, 'hours':hours_in_day}, 
-            hours_in_leapyear, R.Rmultiply)
-mg.add_edge({'use_rand_date': use_random_date, 'min_year': min_year, 'max_year': max_year}, start_year, 
-            Rget_random_year, via=lambda use_rand_date, **kwargs : use_rand_date)
-mg.add_edge({'random': use_random_date, 'days_in_year': days_in_year}, start_day, 
-            Rget_random_day, via=lambda random, **kw : random is True)
-mg.add_edge({'random': use_random_date, 'hours_in_day': hours_in_day}, start_hour, 
-            Rget_random_hour, via=lambda random, **kw : random is True)
-mg.add_edge({'start_year': start_year, 'elapsed_hours': elapsed_hours, 
-             'hours_in_year': hours_in_year, 'hours_in_leapyear': hours_in_leapyear}, 
-            num_leapyears, Rcalc_num_leapyears, label='calc_num_leapyears')
+
+mg.add_edge({'days':days_in_year,
+             'hours':hours_in_day},
+            hours_in_year,
+            rel=R.Rmultiply,
+)
+mg.add_edge({'days':days_in_leapyear,
+             'hours':hours_in_day}, 
+            hours_in_leapyear,
+            rel=R.Rmultiply
+)
+mg.add_edge({'use_rand_date': use_random_date,
+             'min_year': min_year,
+             'max_year': max_year},
+            start_year, 
+            rel=Rget_random_year,
+            via=lambda use_rand_date, **kwargs : use_rand_date
+)
+mg.add_edge({'random': use_random_date,
+             'days_in_year': days_in_year},
+            start_day, 
+            rel=Rget_random_day,
+            via=lambda random, **kw : random is True
+)
+mg.add_edge({'random': use_random_date,
+             'hours_in_day': hours_in_day},
+            start_hour, 
+            rel=Rget_random_hour,
+            via=lambda random, **kw : random is True
+)
+mg.add_edge({'start_year': start_year,
+             'elapsed_hours': elapsed_hours, 
+             'hours_in_year': hours_in_year,
+             'hours_in_leapyear': hours_in_leapyear}, 
+            num_leapyears,
+            rel=Rcalc_num_leapyears,
+            label='calc_num_leapyears',
+)
 mg.add_edge(elapsed_hours, elapsed_hours, R.Rincrement, index_offset=1)
-mg.add_edge({'elapsed_hours': elapsed_hours, 'start_year': start_year, 
-             'num_leapyears': num_leapyears, 'start_day': start_day, 
-             'start_hour': start_hour, 'hours_in_day': hours_in_day, 
-             'hours_in_year': hours_in_year}, year, Rcalc_year,
-             disposable=['elapsed_hours', 'num_leapyears'],
-             index_via=lambda elapsed_hours, num_leapyears, **kw :
-                       R.Rsame(elapsed_hours, num_leapyears))
-mg.add_edge({'elapsed_hours': elapsed_hours, 'start_year': start_year, 
-             'year': year, 'num_leapyears': num_leapyears, 'start_day': start_day, 
-             'start_hour': start_hour, 'hours_in_day': hours_in_day, 
-             'hours_in_year': hours_in_year}, day, Rcalc_day, 
-             disposable=['elapsed_hours', 'year', 'num_leapyears'],
-             index_via=lambda elapsed_hours, year, **kw : R.Rsame(elapsed_hours, year))
-mg.add_edge({'elapsed_hours': elapsed_hours, 'start_hour': start_hour, 
-             'hours_in_day': hours_in_day}, hour, Rcalc_hour)
-mg.add_edge({'day': day, 'hour': hour, 'is_leapyear': is_leapyear, 
-             'hours_in_year': hours_in_year, 'hours_in_leapyear': hours_in_leapyear, 
-             'hours_in_day': hours_in_day}, hour_idx, Rget_hour_index,
+
+mg.add_edge({'elapsed_hours': elapsed_hours,
+             'start_year': start_year, 
+             'num_leapyears': num_leapyears,
+             'start_day': start_day, 
+             'start_hour': start_hour,
+             'hours_in_day': hours_in_day, 
+             'hours_in_year': hours_in_year},
+            year,
+            rel=Rcalc_year,
+            disposable=['elapsed_hours', 'num_leapyears'],
+            index_via=lambda elapsed_hours, num_leapyears, **kw :
+                       R.Rsame(elapsed_hours, num_leapyears)
+)
+mg.add_edge({'elapsed_hours': elapsed_hours,
+             'start_year': start_year, 
+             'year': year,
+             'num_leapyears': num_leapyears,
+             'start_day': start_day, 
+             'start_hour': start_hour,
+             'hours_in_day': hours_in_day, 
+             'hours_in_year': hours_in_year},
+            day,
+            rel=Rcalc_day, 
+            disposable=['elapsed_hours', 'year', 'num_leapyears'],
+            index_via=lambda elapsed_hours, year, **kw : 
+                      R.Rsame(elapsed_hours, year)
+)
+mg.add_edge({'elapsed_hours': elapsed_hours,
+             'start_hour': start_hour, 
+             'hours_in_day': hours_in_day},
+            hour,
+            rel=Rcalc_hour,
+)
+mg.add_edge({'day': day,
+             'hour': hour,
+             'is_leapyear': is_leapyear, 
+             'hours_in_year': hours_in_year,
+             'hours_in_leapyear': hours_in_leapyear, 
+             'hours_in_day': hours_in_day},
+            hour_idx,
+            rel=Rget_hour_index,
             disposable=['day', 'hour', 'is_leapyear'],
-            index_via=lambda day, hour, is_leapyear, **kw : R.Rsame(day, hour, is_leapyear))
+            index_via=lambda day, hour, is_leapyear, **kw : 
+                      R.Rsame(day, hour, is_leapyear)
+)
 mg.add_edge(year, is_leapyear, Rcalc_year_is_leapyear)
 
 ### Grid
-mg.add_edge({'A': conn_matrix, 'B': demand_matrix}, state_matrix, Rlinear_solve, 
-            label='solve state matrix', edge_props=['LEVEL', 'DISPOSE_ALL'])
-mg.add_edge(state_matrix, total_power_balance, 
-            lambda s1, **kwargs : sum(s1), index_offset=1)
-mg.add_edge({'wasted': power_wasted, 'balance': total_power_balance}, power_wasted, 
-            lambda wasted, balance, **kwargs : wasted + min(0., balance), 
-            index_offset=1, edge_props=['LEVEL', 'DISPOSE_ALL'])
-mg.add_edge([B.name for B in BUILDINGs], num_loads, 
-            lambda *args, **kwargs : len(R.extend(args, kwargs)))
-mg.add_edge({'l': list_load_shedding, 'num': num_loads}, all_loads_shed, 
-            lambda l, num, **kwargs : len(l) >= num)
+mg.add_edge({'A': conn_matrix,
+             'B': demand_matrix},
+            state_matrix,
+            rel=Rlinear_solve, 
+            label='solve state matrix',
+            edge_props=['LEVEL', 'DISPOSE_ALL']
+)
+mg.add_edge(state_matrix, 
+            total_power_balance, 
+            rel=lambda s1, **kwargs : sum(s1),
+            index_offset=1
+)
+mg.add_edge({'wasted': power_wasted,
+             'balance': total_power_balance},
+            power_wasted, 
+            rel=lambda wasted, balance, **kwargs : wasted + min(0., balance), 
+            index_offset=1,
+            edge_props=['LEVEL', 'DISPOSE_ALL']
+)
+mg.add_edge([B.name for B in BUILDINGs],
+            num_loads, 
+            rel=lambda *args, **kwargs : len(R.extend(args, kwargs))
+)
+mg.add_edge({'l': list_load_shedding,
+             'num': num_loads},
+            all_loads_shed, 
+            rel=lambda l, num, **kwargs : len(l) >= num
+)
 
 ### Actors
-mg.add_edge([o.demand for o in ACTORS if o not in UGs], islanded_balance, R.Rsum, 
-            label='calc_island_balance', edge_props=['LEVEL', 'DISPOSE_ALL'])
+mg.add_edge([o.demand for o in ACTORS if o not in UGs], 
+            islanded_balance,
+            rel=R.Rsum, 
+            label='calc_island_balance',
+            edge_props=['LEVEL', 'DISPOSE_ALL']
+)
 mg.add_edge({o.name for o in ACTORS}, names, Rsort_names)
+
 keyed_receiving_nodes = {}
 for ACTOR in ACTORS:
     #### Power Flow
-    mg.add_edge({'state': ACTOR.state, 'demand': ACTOR.demand}, ACTOR.is_overloaded, 
-                lambda state, demand, **kwargs : demand > state, 
-                edge_props=['LEVEL', 'DISPOSE_ALL'])
+    mg.add_edge({'state': ACTOR.state,
+                 'demand': ACTOR.demand},
+                ACTOR.is_overloaded, 
+                rel=lambda state, demand, **kwargs : demand > state, 
+                edge_props=['LEVEL', 'DISPOSE_ALL']
+    )
     # mg.add_edge(ACTOR.is_connected, ACTOR.demand, lambda **kwargs : 0., via=lambda s1, **kwargs : s1 is False) #TODO: This should be a super node
-    mg.add_edge(ACTOR.is_connected, ACTOR.state, lambda **kwargs : 0., 
-                via=lambda s1, **kwargs : s1 is False)
-    mg.add_edge({'x': state_matrix, 'name': ACTOR.name, 'names': names}, 
-                ACTOR.state, Rget_state_from_matrix, 
-                label=f'retrieve state of {str(ACTOR)}', index_offset=1)
+    mg.add_edge(ACTOR.is_connected, ACTOR.state, 
+                rel=lambda **kwargs : 0., 
+                via=lambda s1, **kwargs : s1 is False
+    )
+    mg.add_edge({'x': state_matrix,
+                 'name': ACTOR.name,
+                 'names': names}, 
+                ACTOR.state, 
+                rel=Rget_state_from_matrix, 
+                label=f'retrieve state of {str(ACTOR)}', index_offset=1
+    )
     for SRC in ACTORS:
         if SRC is ACTOR:
             mg.add_edge({'receives_from': ACTOR.receives_from[str(SRC)], 
                          'is_conn': ACTOR.is_connected}, 
                         ACTOR.receiving_from[str(SRC)], 
+                        rel=lambda receives_from, is_conn, **kwargs : 
+                            receives_from and is_conn,
                         disposable=['is_conn'],
                         label=f'{str(ACTOR)} receiving from itself',
-                        rel=lambda receives_from, is_conn, **kwargs : 
-                            receives_from and is_conn)
+            )
         else:
             mg.add_edge({'receives_from': ACTOR.receives_from[str(SRC)], 
                          'receiver_conn': ACTOR.is_connected, 
@@ -289,23 +377,32 @@ for ACTOR in ACTORS:
                                       ACTOR.receiving_from[str(SRC)]})
 
     #### Failures and Load Shedding
-    mg.add_edge({'is_failing': ACTOR.is_failing, 'random_fail': has_random_failure, 
-                 'p': ACTOR.prob_failing}, ACTOR.is_failing, 
+    mg.add_edge({'is_failing': ACTOR.is_failing,
+                 'random_fail': has_random_failure, 
+                 'p': ACTOR.prob_failing},
+                ACTOR.is_failing, 
                 rel=lambda p, **kwargs : p > random.random(), index_offset=1,
                 via=lambda random_fail, is_failing, **kwargs : 
-                    random_fail is True and is_failing is False)
-    mg.add_edge({'is_failing': ACTOR.is_failing, 'p': ACTOR.prob_fixed}, ACTOR.is_failing, 
+                    random_fail is True and is_failing is False
+    )
+    mg.add_edge({'is_failing': ACTOR.is_failing,
+                 'p': ACTOR.prob_fixed},
+                ACTOR.is_failing, 
                 rel=lambda p, **kwargs : not (p > random.random()), index_offset=1,
-                via=lambda is_failing, **kwargs : is_failing is True)
+                via=lambda is_failing, **kwargs : is_failing is True
+    )
     #TODO: Need a way to specify failures of connectivity (like BUS1/BUS2 line)
-    mg.add_edge({'shedding_list': list_load_shedding, 'name': ACTOR.name}, 
+    mg.add_edge({'shedding_list': list_load_shedding,
+                 'name': ACTOR.name}, 
                 ACTOR.is_load_shedding, 
-                rel=lambda shedding_list, name, **kwargs : name in shedding_list)
+                rel=lambda shedding_list, name, **kwargs : name in shedding_list
+    )
     if ACTOR not in UGs:
         mg.add_edge({'is_failing': ACTOR.is_failing, 'is_load_shedding': ACTOR.is_load_shedding}, 
                     ACTOR.is_connected, R.Rnot_any)
 
-mg.add_edge(keyed_receiving_nodes | {'names': names, 'key_sep': key_sep}, conn_matrix, 
+mg.add_edge(keyed_receiving_nodes | {'names': names, 'key_sep': key_sep},
+            conn_matrix, 
             rel=Rform_connectivity_matrix, 
             label='form connectivity matrix',
             disposable=[key for key in keyed_receiving_nodes],
@@ -314,15 +411,21 @@ mg.add_edge(keyed_receiving_nodes | {'names': names, 'key_sep': key_sep}, conn_m
 #### Demand matrix
 demand_pairs = {'names': names}
 for i, ACTOR in enumerate(ACTORS):
-    mg.add_edge({'name': ACTOR.name, 'demand': ACTOR.demand}, ACTOR.demand_pair, 
+    mg.add_edge({'name': ACTOR.name,
+                 'demand': ACTOR.demand}, 
+                ACTOR.demand_pair, 
                 rel=lambda name, demand : R.Rtuple(name, demand), 
-                disposable='demand')
+                disposable='demand'
+    )
     demand_pairs[f's{i}'] = ACTOR.demand_pair
-mg.add_edge(demand_pairs, demand_matrix, Rform_demand_matrix, 
+    
+mg.add_edge(demand_pairs, demand_matrix, 
+            rel=Rform_demand_matrix, 
             label='form demand matrix', 
             disposable=[key for key in demand_pairs if key != 'names'],
             index_via=lambda **kwargs : R.Rsame(*[kwargs[key] for key in demand_pairs 
-                                                  if key != 'names']))
+                                                  if key != 'names'])
+)
 
 ### Busses
 for BUS in BUSs:
@@ -330,98 +433,176 @@ for BUS in BUSs:
 
 ### Utility Grids
 for UG in UGs:
-    mg.add_edge({'island': island_mode, 'failing': UG.is_failing, 'load_shedding': UG.is_load_shedding}, 
-                UG.is_connected, R.Rnot_any, disposable='failing')
-    mg.add_edge({'conn': UG.is_connected, 'load': islanded_balance}, UG.demand, 
+    mg.add_edge({'island': island_mode,
+                 'failing': UG.is_failing,
+                 'load_shedding': UG.is_load_shedding}, 
+                UG.is_connected,
+                rel=R.Rnot_any, disposable='failing'
+    )
+    mg.add_edge({'conn': UG.is_connected, 
+                 'load': islanded_balance},
+                UG.demand, 
                 #TODO: This really should be the load of everything connected to the UG
-                lambda conn, load, **kw : abs(load) if conn else 0., edge_props='LEVEL')
-    mg.add_edge(UGs.is_connected, is_islanded, 
+                rel=lambda conn, load, **kw : abs(load) if conn else 0.,
+                edge_props='LEVEL'
+    )
+    mg.add_edge(UGs.is_connected, 
+                is_islanded, 
                 rel=lambda *args, **kwargs : not any(R.extend(args, kwargs)),
-                edge_props=['LEVEL', 'DISPOSE_ALL'])
+                edge_props=['LEVEL', 'DISPOSE_ALL']
+    )
 
 ### Solar
 mg.add_edge(year, sunlight_filename, Rget_solar_filename)
+
 mg.add_edge(sunlight_filename, sunlight_data, Rget_data_from_csv_file)
-mg.add_edge({'csv_data': sunlight_data, 'row': hour_idx, 'col': sunlight_data_label}, 
-            sunlight, Rget_float_from_csv_data,
+
+mg.add_edge({'csv_data': sunlight_data,
+             'row': hour_idx,
+             'col': sunlight_data_label}, 
+            sunlight,
+            rel=Rget_float_from_csv_data,
             index_via=lambda csv_data, row, **kw: R.Rsame(csv_data, row), 
-            disposable=['csv_data', 'row'])
+            disposable=['csv_data', 'row']
+)
 for PV in PVs:
-    mg.add_edge({'conn': PV.is_connected, 'area': PV.area, 'efficiency': 
-                 PV.efficiency, 'sunlight': sunlight}, PV.demand, 
+    mg.add_edge({'conn': PV.is_connected,
+                 'area': PV.area,
+                 'efficiency': PV.efficiency,
+                 'sunlight': sunlight},
+                PV.demand, 
                 rel=Rcalc_solar_demand, 
                 disposable=['sunlight', 'conn'],
-                index_via=lambda conn, sunlight, **kw : R.Rsame(conn, sunlight))
+                index_via=lambda conn, sunlight, **kw : R.Rsame(conn, sunlight)
+    )
+    mg.add_edge(PV.demand, PV.supply, R.Rfirst)
     
 ### Wind
 for W in WINDs:
-    mg.add_edge({'area': W.rotor_area, 'power_coef': W.power_coef, 
-                 'velocity': wind_speed, 'density': air_density}, W.supply, 
-                 rel=Rcalc_wind_supply,
-                 disposable=['velocity', 'density'],
-                 index_via=lambda density, velocity, **kw : R.Rsame(density, velocity))
+    mg.add_edge({'area': W.rotor_area, 
+                 'power_coef': W.power_coef, 
+                 'velocity': wind_speed,
+                 'density': air_density}, 
+                W.supply, 
+                rel=Rcalc_wind_supply,
+                disposable=['velocity', 'density'],
+                index_via=lambda density, velocity, **kw : R.Rsame(density, velocity)
+    )
 
 ### Buildings
-mg.add_edge([B.demand for B in BUILDINGs], total_load, Rdetermine_load, 
-            edge_props=['LEVEL', 'DISPOSE_ALL'])
+mg.add_edge([B.demand for B in BUILDINGs], 
+            total_load, 
+            rel=Rdetermine_load, 
+            edge_props=['LEVEL', 'DISPOSE_ALL']
+)
 #TODO: There needs to be a more systematic way of indicating that an actor solves for load_shedding.
 shedding_nodes = {'balance': total_power_balance, 
                   generate_building_keyword('balance', 'index') : ('balance', 'index')}
 for B in BUILDINGs:
+    mg.add_edge(B.req_demand, B.max_demand, R.Rfirst)
+    
+    mg.add_edge(B.priority, B.benefit, R.Rfirst) #TODO: Replace priority with benefit
+    
     mg.add_edge(B.type, B.building_filename, Rget_building_filename)
+
     mg.add_edge(B.building_filename, B.load_data, Rget_data_from_csv_file)
-    mg.add_edge({'csv_data': B.load_data, 'row': hour_idx, 'col': B.normal_col_name}, 
-                B.normal_load, Rget_load_from_building_data)
-    mg.add_edge({'csv_data': B.load_data, 'row': hour_idx, 'col': B.lights_col_name}, 
-                B.lights_load, Rget_load_from_building_data)
-    mg.add_edge({'csv_data': B.load_data, 'row': hour_idx, 'col': B.equipment_col_name}, 
-                B.equipment_load, Rget_load_from_building_data)
-    mg.add_edge({'lights': B.lights_load, 'equipment': B.equipment_load},
-                B.critical_load, Rcalc_critical_load,
-                edge_props=['LEVEL', 'DISPOSE_ALL'])
+
+    mg.add_edge({'csv_data': B.load_data,
+                 'row': hour_idx,
+                 'col': B.normal_col_name}, 
+                B.normal_load,
+                rel=Rget_load_from_building_data
+    )
+    mg.add_edge({'csv_data': B.load_data, 
+                 'row': hour_idx, 
+                 'col': B.lights_col_name}, 
+                B.lights_load,
+                rel=Rget_load_from_building_data
+    )
+    mg.add_edge({'csv_data': B.load_data, 
+                 'row': hour_idx, 
+                 'col': B.equipment_col_name}, 
+                B.equipment_load, 
+                rel=Rget_load_from_building_data
+    )
+    mg.add_edge({'lights': B.lights_load,
+                 'equipment': B.equipment_load},
+                B.critical_load,
+                rel=Rcalc_critical_load,
+                edge_props=['LEVEL', 'DISPOSE_ALL']
+    )
+    #TODO: Need to implement a way for the critical load to be passed as well.
+    mg.add_edge(B.normal_load, B.req_demand, R.Rfirst)
+
     #TODO: Need a way to tell if a building is connected to the Utility 
     #   Grid for bus failures that should induce critical loads
-    mg.add_edge({'conn': B.is_connected, 'normal': B.normal_load, 
-                 'critical': B.critical_load, 'island': is_islanded}, 
-                B.demand, Rdetermine_building_load, 
+    mg.add_edge({'conn': B.is_connected, 
+                 'normal': B.normal_load, 
+                 'critical': B.critical_load,
+                 'island': is_islanded}, 
+                B.demand, 
+                rel=Rdetermine_building_load, 
                 edge_props=['LEVEL', 'DISPOSE_ALL'], 
                 label='calc building demand')
+
     state_label, priority_label, index_label = [generate_building_keyword(B, s) 
                                                 for s in ['load', 'priority', 'index']]
     shedding_nodes[state_label] = B.state
     shedding_nodes[priority_label] = B.priority
     shedding_nodes[index_label] = (state_label, 'index')
-mg.add_edge(shedding_nodes | {'names': names, 'key_sep': key_sep}, list_load_shedding, 
+
+mg.add_edge(shedding_nodes | {'names': names, 'key_sep': key_sep}, 
+            list_load_shedding, 
             rel=Rdetermine_load_shedding, 
             via=Vload_nodes_are_level, 
-            disposable=[generate_building_keyword(B, 'load') for B in BUILDINGs] + ['balance'])
+            disposable=[generate_building_keyword(B, 'load') for B in BUILDINGs] + ['balance']
+)
+
 
 ### Generators
-mg.add_edge({'refuel_time': next_refuel_hour, 'curr_hour': hour_idx, 
-             'prob': prob_daily_refueling, 'hours_in_day': hours_in_day}, 
-            next_refuel_hour, Rcalc_next_time_for_refueling, 
+mg.add_edge({'refuel_time': next_refuel_hour,
+             'curr_hour': hour_idx, 
+             'prob': prob_daily_refueling,
+             'hours_in_day': hours_in_day}, 
+            next_refuel_hour, 
+            rel=Rcalc_next_time_for_refueling, 
             index_offset=1,
             disposable=['refuel_time', 'curr_hour'],
             index_via=lambda refuel_time, curr_hour, **kw : 
-                      R.Rsame(refuel_time, curr_hour))
+                      R.Rsame(refuel_time, curr_hour)
+)
 for G in GENs:
-    mg.add_edge({'fl': G.fuel_level, 'tol': tol}, G.out_of_fuel, 
-                lambda fl, tol, **kwargs :abs(fl) < tol)
-    mg.add_edge({'is_islanded': is_islanded, 'load': total_load, 
-                 'max_out': G.max_output, 'conn': G.is_connected, 
-                 'out_of_fuel': G.out_of_fuel}, G.demand,
+    mg.add_edge({'fl': G.fuel_level, 
+                 'tol': tol}, 
+                G.out_of_fuel, 
+                rel=lambda fl, tol, **kwargs :abs(fl) < tol
+    )
+    mg.add_edge({'is_islanded': is_islanded,
+                 'load': total_load, 
+                 'max_out': G.max_output,
+                 'conn': G.is_connected, 
+                 'out_of_fuel': G.out_of_fuel}, 
+                G.demand,
                 rel=Rcalc_generator_demand, label=f'calc demand for {G}',
                 disposable=['is_islanded', 'load', 'conn', 'out_of_fuel'],
                 index_via=lambda is_islanded, load, conn, out_of_fuel, **kw : 
-                          R.Rsame(is_islanded, load, conn, out_of_fuel))
+                          R.Rsame(is_islanded, load, conn, out_of_fuel)
+    )
     mg.add_edge({'init': G.starting_fuel_level, 'max': G.fuel_capacity}, 
-                G.fuel_level, R.Rmin)
-    mg.add_edge({'refuel_time': next_refuel_hour, 'curr_hour': hour_idx, 
-                 'curr_level': G.fuel_level, 'max_level': G.fuel_capacity}, 
-                G.fuel_level, Rcalc_generator_fuel_level, 
+                G.fuel_level, R.Rmin
+    )
+    mg.add_edge({'refuel_time': next_refuel_hour, 
+                 'curr_hour': hour_idx, 
+                 'curr_level': G.fuel_level,
+                 'max_level': G.fuel_capacity}, 
+                G.fuel_level, 
+                rel=Rcalc_generator_fuel_level, 
                 disposable=['refuel_time', 'curr_hour', 'curr_level'], index_offset=1,
                 index_via=lambda refuel_time, curr_hour, curr_level, **kw : 
-                          R.Rsame(refuel_time, curr_hour, curr_level))
+                          R.Rsame(refuel_time, curr_hour, curr_level)
+    )
+    mg.add_edge(G.max_output, G.supply, R.Rfirst)
+
 
 ### Batteries
 for B in BATTERYs:
@@ -430,17 +611,51 @@ for B in BATTERYs:
                 rel=Rdetermine_battery_is_charging, 
                 label='determine if battery is charging',
                 disposable=['island', 'load'],
-                index_via=lambda island, load, level, **kw : R.Rsame(island, load, level))
-    mg.add_edge({'is_charging': B.is_charging, 'load': total_load, 'level':B.charge_level, 
-                 'capacity': B.charge_capacity, 'max_rate': B.max_charge_rate, 'max_output': B.max_output, 
+                index_via=lambda island, load, level, **kw : R.Rsame(island, load, level)
+    )
+    mg.add_edge({'is_charging': B.is_charging, 'load': total_load, 
+                 'level':B.charge_level, 'capacity': B.charge_capacity, 
+                 'max_rate': B.max_charge_rate, 'max_output': B.max_output, 
                  'trickle_prop': batt_trickle}, B.demand, 
                 rel=Rcalc_battery_demand, 
                 label='calc battery demand',
                 disposable=['level', 'is_charging', 'load'],
-                index_via=lambda is_charging, load, level, **kw : R.Rsame(is_charging, load, level))
+                index_via=lambda is_charging, load, level, **kw : 
+                          R.Rsame(is_charging, load, level)
+    )
     mg.add_edge({'state': B.state, 'level': B.charge_level, 
                  'max_level': B.charge_capacity, 'eff': B.efficiency}, 
                 B.charge_level, 
                 rel=Rcalc_battery_charge_level, 
                 label='calc battery charge level',
-                index_via=lambda state, level, **kw: R.Rsame(state-1, level))
+                index_via=lambda state, level, **kw: R.Rsame(state-1, level)
+    )
+    mg.add_edge({'level': B.charge_level, 
+                 'capacity': B.charge_capacity}, 
+                B.soc,
+                rel=R.Rdivide, 
+                edge_props=['LEVEL, DISPOSE_ALL']
+    )
+    mg.add_edge({'ug_cost': UGs[0].cost, 
+                 'tol': tol, 
+                 'level': B.charge_level, 
+                 'capacity': B.charge_capacity, 
+                 'factor': B.scarcity_factor}, 
+                B.cost, 
+                rel=Rcalc_battery_cost
+    )
+    mg.add_edge({'ug_cost': UGs[0].cost, 
+                 'level': B.charge_level, 
+                 'capacity': B.charge_capacity, 
+                 'factor': B.scarcity_factor},
+                B.benefit, 
+                rel=Rcalc_battery_benefit,
+    )    
+    mg.add_edge({'level': B.charge_level,
+                 'capacity': B.charge_capacity,
+                 'max_rate': B.max_charge_rate,
+                 'trickle_prop': batt_trickle}, 
+                B.max_demand, 
+                rel=R.Rfirst,
+    )
+    mg.add_edge(B.max_output, B.supply, R.Rfirst)

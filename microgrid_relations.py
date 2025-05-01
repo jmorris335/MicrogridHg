@@ -273,7 +273,6 @@ def Rdetermine_building_load(conn: bool, normal: float, critical: float,
     load = -load
     return load
 
-
 ## Generators
 def Rcalc_generator_demand(is_islanded: bool, load: float, max_out: float, 
                            out_of_fuel: bool, conn: bool, **kwargs)-> float:
@@ -311,7 +310,7 @@ def Rcalc_battery_demand(island: bool, is_charging: bool, load: float,
         highest_output = min(max_output, level)
         demand = max(0, min(abs(load), highest_output))
     elif is_charging:
-        if level < 0.8 * capacity:
+        if level > 0.8 * capacity:
             demand = trickle_prop * max_rate
         else:
             demand = max_rate
@@ -333,6 +332,33 @@ def Rcalc_battery_charge_level(state: float, level: float, max_level: float,
     expected_level = level + (eff * state)
     new_level = max(0, min(expected_level, max_level))
     return new_level
+
+def Rcalc_battery_cost(ug_cost: float, tol: float, level: float, 
+                       capacity: float, factor: float):
+    """Calculate the cost of using the battery."""
+    if level <= tol:
+        return float('inf')
+    level_factor = (1 - level / capacity) * factor
+    cost = ug_cost + (ug_cost * level_factor)
+    return cost
+
+def Rcalc_battery_benefit(ug_cost: float, level: float, capacity:float, factor: float):
+    """Calculate the benefit of charging the battery."""
+    if level >= capacity:
+        return 0.
+    level_factor = level / capacity * factor
+    benefit = ug_cost + (ug_cost * level_factor)
+    return benefit
+
+def Rcalc_battery_max_demand(level: float, capacity: float, max_rate: float, 
+                             trickle_prop: float, **kwargs)-> float:
+    """Calculates the maximum power the battery can receive."""
+    if level > 0.8 * capacity:
+        demand = trickle_prop * max_rate
+    else:
+        demand = max_rate
+    demand = -abs(demand)
+    return demand
 
 
 ## Power distribution strategy

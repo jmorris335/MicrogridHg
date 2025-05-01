@@ -191,7 +191,13 @@ class Battery(GridActor):
     distribution."""
     def __init__(self, name: str, charge_level: float=None, 
                  charge_capacity: float=None, max_output: float=None, 
-                 efficiency: float=None, max_charge_rate: float=None, **kwargs):
+                 efficiency: float=None, max_charge_rate: float=None, 
+                 scarcity_factor: float=None, **kwargs):
+        defaults = dict(
+            req_demand = 0.,
+        )
+        kwargs = defaults | kwargs
+
         self.charge_level = Node(
             f'charge_level_{name}',
             charge_level, 
@@ -222,10 +228,20 @@ class Battery(GridActor):
             max_charge_rate, 
             description='max charge rate for battery', units='kW/hr'
         )
+        self.scarcity_factor = Node(
+            f'scarcity_factor_{name}',
+            scarcity_factor,
+            description='cost gain based on using an increasingly depleted battery'
+        )
         self.is_charging = Node(
             f'{name} is charging',
-            None,
+            kwargs.get('is_charging', None),
             description='true if battery is set for charging'
+        )
+        self.soc = Node(
+            f'SOC_{name}',
+            kwargs.get('soc', None),
+            description='state of charge (0 to 1, with 1 being full)'
         )
         super().__init__(name, **kwargs)
 
