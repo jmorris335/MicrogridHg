@@ -38,6 +38,7 @@ PVs = [
 ]
 
 WINDs = [
+    #TODO: Wind speed and density data need to be supplied
     # WindTurbine(
     #     name='Wind1',
     #     rotor_area=3800.,
@@ -85,7 +86,7 @@ BUILDINGs = [
     Building('Building5Warehouse', BUILDING_TYPE.WAREHOUSE, benefit=74),
 ]
 
-ACTORS = GENs + BATTERYs + UGs + BUSs + PVs + BUILDINGs
+ACTORS = GENs + BATTERYs + UGs + BUSs + PVs + BUILDINGs + WINDs
 
 ### Connectivity
 #### Receivers (set which actors are wired to receive power from which other actors)
@@ -93,7 +94,7 @@ for ACTOR in ACTORS: #Set default as not connected
     for SRC in ACTORS:
         ACTOR.add_source(SRC, SRC is ACTOR)
 
-bus0 = UGs + GENs + [BUILDINGs[i] for i in [0, 3, 4]] + [BUSs[1]]
+bus0 = UGs + GENs + WINDs + [BUILDINGs[i] for i in [0, 3, 4]] + [BUSs[1]]
 bus1 = BATTERYs + PVs + [b for b in set(BUILDINGs).difference(bus0)] + [BUSs[0]]
 
 for SRC in bus0:
