@@ -1,6 +1,7 @@
 """Helper class for plotting."""
 import matplotlib.pyplot as plt
 import constrainthg as chg
+from collections import defaultdict
 
 plt.rcParams['font.family'] = 'times'
 
@@ -37,7 +38,7 @@ def solve_and_append(hg: chg.Hypergraph, found_values: dict, node: chg.Node, inp
     return found_values
 
 def plot_time_values(labels: list, found_values: dict, time_step: float, 
-                   title: str='Simulation'):
+                   title: str='Simulation', ylabel: str='Variables'):
     """Plots the values in the dictionary as a function of time.
     
     Parameters
@@ -51,6 +52,8 @@ def plot_time_values(labels: list, found_values: dict, time_step: float,
         the time node in the `found_values` parameter.
     title : str, optional
         The title of the plot.
+    ylabel : str, optional
+        The label for the vertical axis.
     """
     dashes = ['--', ':', '-.']
     legend = []
@@ -69,8 +72,29 @@ def plot_time_values(labels: list, found_values: dict, time_step: float,
         # plt.plot(times[:len(values)], values[:len(times)], 'k', lw=2, linestyle=dash) 
         plt.plot(times[:len(values)], values[:len(times)], lw=2) 
         legend.append(legend_label)
-    plt.legend(legend)
-    plt.ylabel('Variables')
+
+    # Place legend
+    ax = plt.gca()
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+    ax.legend(legend, loc='center left', bbox_to_anchor=(1, 0.5))
+
+    plt.ylabel(ylabel)
     plt.xlabel('Time (hours)')
     plt.title(title)
     plt.show()
+
+def solve_and_plot_states(mg: chg.Hypergraph, inputs: dict, min_index: int=8,
+                          state_vector: str='state_matrix',):
+    """Solves the Hypergraph for the `state_vector`, then plots the 
+    state of each actor on the grid."""
+    t = mg.solve(state_vector, inputs=inputs, min_index=min_index)
+    fv = t.values
+    names = fv.get('names', [mg.solve('names', inputs=inputs).value])[0]
+    states = defaultdict(list)
+    states['elapsed_hours'] = fv['elapsed hours']
+    for sv in fv[state_vector]:
+        for state_value, name in zip(sv, names):
+            states[name].append(state_value)
+    plot_time_values(names, states, 'elapsed_hours', 
+                     title='States of Grid Actors', ylabel='Power (kW)')

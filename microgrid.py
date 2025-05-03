@@ -168,7 +168,7 @@ conn_matrix = Node('connectivity matrix',
     description='cell ij indicates actor[i] receives power from actor[j]')
 demand_vector = Node('demand vector', 
     description='desired state for each actor on the grid')
-state_matrix = Node('state matrix', 
+state_matrix = Node('state_matrix', 
     description='state from each actor on the grid')
 # total_load = Node('total_load', description='total power required to run the microgrid')
 islanded_balance = Node('islanded_balance', description='balance of grid sans Utility Grid')

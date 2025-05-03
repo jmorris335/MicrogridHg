@@ -27,6 +27,9 @@ if t is not None:
 else:
     print("No solutions found")
 
+# Solve for and plot actor states
+# solve_and_plot_states(mg, inputs, 72)
+
 # Solve for multiple nodes and indices (exhaustive)
 # solve_and_plot(mg, [PVs[0].demand, elapsed_hours, sunlight, 
 #                BUILDINGs[0].demand], inputs, indices=[5, 5, 5, 5])
