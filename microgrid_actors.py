@@ -103,6 +103,24 @@ class GridActor:
             description=f'Current energy that the actor can supply',
             units='kW'
         )
+
+        #TODO: This default value is not used because default nodes get resolved for (CHg Issue #2)
+        default_d_tuple = (name,*[kwargs.get(l, None) 
+                                  for l in ['benefit', 'req_demand', 'max_demand']])
+        self.demand_tuple = Node(
+            f'demand_tuple_{name}',
+            # None if None in default_d_tuple else default_d_tuple,
+            None,
+            description=f'Values for calculating {name} demand',
+        )
+        default_s_tuple = (name,*[kwargs.get(l, None) 
+                                  for l in ['cost', 'supply']])
+        self.supply_tuple = Node(
+            f'supply_tuple_{name}',
+            # None if None in default_s_tuple else default_s_tuple,
+            None,
+            description=f'Values for calculating {name} supply',
+        )
         
     def add_source(self, source, val: bool=True):
         """Creates a node indicating that the source GridObject is wired 
@@ -302,7 +320,6 @@ class Building(GridActor):
     """A grid object with a determined load."""
     def __init__(self, name: str, type: BUILDING_TYPE=None, **kwargs):
         defaults = dict(
-            benefit = 0.,
             cost = float('inf'),
             supply = 0.,
         )

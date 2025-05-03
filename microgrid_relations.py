@@ -181,7 +181,7 @@ def Rdetermine_load_shedding(names: list, balance: float, key_sep: str, **kwargs
         The total system balance.
     key_sep : str 
         String splitting `load` and `priority`.
-    \**kwargs : dict
+    **kwargs : dict
         - load *(& OBJ)* : str
             Load of the object split by `key_sep`.
         - priority *(& OBJ)* : str
@@ -213,6 +213,14 @@ def Vload_nodes_are_level(key_sep: str, **kwargs)-> bool:
                          if kw.split(key_sep)[0] == 'index'}
     return len(load_node_indices) == 1
 
+def Rdeterming_if_failing(is_failing: bool, p_fail: float, p_fix: float, 
+                          *args, **kwargs)-> bool:
+    """Returns true if the actor is failing."""
+    p = random.random()
+    if not is_failing:
+        return p > p_fail
+    return not (p > p_fix)
+
 
 ## Utility Grid
 def Rcalc_ug_demand(conn: bool, islanded_balance: float, *args, **kwargs)-> float:
@@ -241,6 +249,7 @@ def Rcalc_solar_demand(conn: bool, area: float, efficiency: float,
     # if not conn:
     #     return 0.0
     power = max(0, area * efficiency * sunlight)
+    power = power / 1000
     return power
 
 
@@ -362,9 +371,9 @@ def Rcalc_battery_max_demand(level: float, capacity: float, max_rate: float,
 
 
 ## Power distribution strategy
-def Rmake_state_vector(conn: list, names: list, tol: float, 
+def Rmake_demand_vector(conn: list, names: list, tol: float, 
                        *args, **kwargs)->list:
-    """Determines the state for each object on the grid.
+    """Determines the demand for each object on the grid.
 
     Parameters
     ----------
@@ -376,7 +385,7 @@ def Rmake_state_vector(conn: list, names: list, tol: float,
         both the rows and columns of ``conn``.
     tol : float
         Minimum value used for floating point comparisons with zero.
-    \**kwargs : dict
+    **kwargs : dict
         Must contain n source tuples and n demand tuples keyed with a 
         keyword containing either ``source_tuples`` or ``demand_tuples`` 
         respectively. Source tuples are of the format ``(label, cost, 
@@ -417,9 +426,11 @@ def Rmake_state_vector(conn: list, names: list, tol: float,
 
     circuits = get_circuits(conn, names)
     circuits.sort(key=lambda c : sum([len(a) for a in c]), reverse=True)
+
     for suppliers, demanders in circuits:
         ind_suppliers = set(suppliers).difference(states.keys())
         ind_demanders = set(demanders).difference(states.keys())
+
         if len(ind_suppliers) != len(suppliers) or len(ind_demanders) != len(demanders):
             msg = 'Non-independent grid circuit encountered.'
             msg += 'Repeated actors may not be optimally considered by power distribution strategy.'
@@ -428,9 +439,10 @@ def Rmake_state_vector(conn: list, names: list, tol: float,
 
         sts_filtered = [st for st in supply_tuples if st[0] in ind_suppliers]
         dts_filtered = [dt for dt in demand_tuples if dt[0] in ind_demanders]
-        supply_queue = make_supply_queue(*sts_filtered)
-        demand_queue = make_demand_queue(*dts_filtered)
-        found_states = meet_circuit_demand(demand_queue, supply_queue, tol, names)
+        supply_queue = make_supply_queue(tol, *sts_filtered)
+        demand_queue = make_demand_queue(tol, *dts_filtered)
+
+        found_states = meet_circuit_demand(demand_queue, supply_queue, tol)
         if any([fs in states for fs in found_states]):
             msg = 'Non-independent grid circuit neglected: power distribution ' \
             'strategy may be faulty and some actors\' state set to 0.'
@@ -489,7 +501,7 @@ def can_send_to(src, sink, conn: list, visited: set=None):
         return any([can_send_to(new_src, sink, conn, visited) 
                     for new_src in direct_sinks])
 
-def make_demand_queue(*args, **kwargs):
+def make_demand_queue(tol: float, *args, **kwargs):
     """Compiles the demand queue from the demand tuples, sorted by 
     benefit. Queue is compiled from tuples passed to *args or **kwargs 
     of the following form: ``(label, benefit, req_demand, max_demand)``
@@ -499,20 +511,27 @@ def make_demand_queue(*args, **kwargs):
     considers the efficiency of the load.*
     """
     args = R.extend(args, kwargs)
-    demand_queue = [val for val in args 
-                    if isinstance(val, tuple) and len(val) == 4]
+    demand_queue = [val for val in args if all([
+                        isinstance(val, tuple),
+                        len(val) == 4,
+                        val[1] > -tol,
+                        val[2] > -tol])]
     demand_queue.sort(key=lambda a : a[1], reverse=True)
     return demand_queue
 
-def make_supply_queue(*args, **kwargs):
+def make_supply_queue(tol: float, *args, **kwargs):
     """Compiles the supply queue from the supply tuples, sorted by cost. 
     Queue is compiled from tuples passed to *args or **kwargs of the 
     following form: ``(label, cost, supply)``
     """
     args = R.extend(args, kwargs)
-    supply_queue = [val for val in args 
-                    if isinstance(val, tuple) and len(val) == 3]
+    supply_queue = [val for val in args if all([
+                        isinstance(val, tuple),
+                        len(val) == 3,
+                        val[1] != float('inf'),
+                        val[2] > -tol])]
     supply_queue.sort(key=lambda a : a[1])
+
     return supply_queue
 
 def meet_circuit_demand(demand_queue: list, supply_queue: list, tol: float):
@@ -605,7 +624,7 @@ def meet_max_demands(demand_q: list, supply_q: list, states: dict,
     unmet_d = max_d - req_d
 
     try:
-        while benefit >= cost:
+        while True:
             while unused_s < tol or actor_is_receiving(s_label, states):
                 s_label, cost, supply = supply_q[s_idx := s_idx + 1]
                 unused_s = supply
@@ -616,6 +635,8 @@ def meet_max_demands(demand_q: list, supply_q: list, states: dict,
                 d_label, benefit, req_d, max_d = demand_q[d_idx := d_idx + 1]
                 unmet_d = max_d - req_d
 
+            if benefit < cost:
+                break
             unmet_d, unused_s = meet_actor_demand(unmet_d, unused_s)
             states[s_label] = abs(supply - unused_s)
             states[d_label] = -abs(max_d - unmet_d)

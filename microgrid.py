@@ -15,53 +15,61 @@ mg = Hypergraph(no_weights=True)
 ## ----- Actors ----- ##
 ### Initialize Actors
 UGs = [
-    GridActor('UtilityGrid', 
-              is_load_shedding=False,
-              benefit=0.4,
-              cost=0.13,
-              req_demand=0.,
-              max_demand=120.,
-              supply=20000.,
+    GridActor(
+        'UtilityGrid', 
+        is_load_shedding=False,
+        benefit=0.4,
+        cost=0.13,
+        req_demand=0.,
+        max_demand=120.,
+        supply=20000.,
     )
 ]
-BUSs = [
-    Bus('Bus1'),
-    Bus('Bus2'),
-]
+
+BUSs = [Bus('Bus1'), Bus('Bus2')]
+
 PVs = [
-    PhotovoltaicArray('PV1', 
-                      area=10000,
-                      efficiency=.18,
-                      cost=0.02,
+    PhotovoltaicArray(
+        'PV1', 
+        area=10000,
+        efficiency=.18,
+        cost=0.02,
     )
 ]
+
 WINDs = []
+
 GENs = [
-    Generator('Generator1', 
-              fuel_capacity=2500., 
-              starting_fuel_level=2500., 
-              max_output=30., 
-              efficiency=0.769,
-              cost=10.,
+    Generator(
+        'Generator1', 
+        fuel_capacity=2500., 
+        starting_fuel_level=2500., 
+        max_output=30., 
+        efficiency=0.769,
+        cost=10.,
     ), 
-    Generator('Generator2', 
-              fuel_capacity=2500., 
-              starting_fuel_level=2500., 
-              max_output=100., 
-              efficiency=0.769,
-              cost=25.,
+    Generator(
+        'Generator2', 
+        fuel_capacity=2500., 
+        starting_fuel_level=2500., 
+        max_output=100., 
+        efficiency=0.769,
+        cost=25.,
     ), 
 ]
+
 BATTERYs = [
-    Battery('Battery1', 
-            charge_capacity=10000.,
-            charge_level=10000., 
-            max_output=100.,
-            efficiency=0.9747,
-            max_charge_rate=2.,
-            scarcity_factor=1.5,
+    Battery(
+        'Battery1', 
+        charge_capacity=10000.,
+        charge_level=10000., 
+        max_output=100.,
+        efficiency=0.9747,
+        max_charge_rate=2.,
+        scarcity_factor=1.5,
     ),
 ]
+
 BUILDINGs = [
     Building('Building1Small', BUILDING_TYPE.SMALL, priority=10),
     Building('Building2Small', BUILDING_TYPE.SMALL, priority=15),
@@ -69,6 +77,7 @@ BUILDINGs = [
     Building('Building4Large', BUILDING_TYPE.LARGE, priority=93),
     Building('Building5Warehouse', BUILDING_TYPE.WAREHOUSE, priority=74),
 ]
+
 ACTORS = GENs + BATTERYs + UGs + BUSs + PVs + BUILDINGs
 
 ### Connectivity
@@ -77,9 +86,8 @@ for ACTOR in ACTORS: #Set default as not connected
     for SRC in ACTORS:
         ACTOR.add_source(SRC, SRC is ACTOR)
 
-
-bus0 = UGs + GENs + [BUILDINGs[i] for i in [0, 3, 4]] + BUSs[1]
-bus1 = BATTERYs + PVs + [b for b in set(BUILDINGs).difference(bus0)] + BUSs[0]
+bus0 = UGs + GENs + [BUILDINGs[i] for i in [0, 3, 4]] + [BUSs[1]]
+bus1 = BATTERYs + PVs + [b for b in set(BUILDINGs).difference(bus0)] + [BUSs[0]]
 
 for SRC in bus0:
     BUSs[0].add_source(SRC, True)
@@ -87,6 +95,36 @@ for SRC in bus0:
 for SRC in bus1:
     BUSs[1].add_source(SRC, True)
     SRC.add_source(BUSs[1], True)
+
+def make_demand_tuple_edge(ACTOR: GridActor, dynamic: list):
+    """Convenience function for making the demand tuple edge.
+    
+    #TODO: This function is provided for convenience. Eventually there 
+    needs to be a way to specify disposal doesn't affect input nodes. 
+    Otherwise we need to make a index_via/disposal method for each 
+    object since some treat these nodes statically, while others do not.
+    """
+    mg.add_edge({'label': ACTOR.name,
+                 'benefit': ACTOR.benefit,
+                 'req_demand': ACTOR.req_demand,
+                 'max_demand': ACTOR.max_demand},
+                ACTOR.demand_tuple,
+                rel=lambda **kw : R.to_tuple(['label', 'benefit', 'req_demand',
+                                               'max_demand'], **kw),
+                disposable=dynamic,
+                index_via=lambda **kw : R.Rsame(*[kw[key] for key in dynamic]),
+                label='make_demand_tuple')
+    
+def make_supply_tuple_edge(ACTOR: GridActor, dynamic: list):
+    """Convenience function for making the supply tuple edge."""
+    mg.add_edge({'label': ACTOR.name,
+                 'cost': ACTOR.cost,
+                 'supply': ACTOR.supply},
+                ACTOR.supply_tuple,
+                rel=lambda **kw : R.to_tuple(['label', 'cost', 'supply'], **kw),
+                disposable=dynamic,
+                index_via=lambda **kw : R.Rsame(*[kw[key] for key in dynamic]),
+                label='make_supply_tuple')
 
 # for SRC in BUS1:
 #     for SINK in BUS1:
@@ -141,11 +179,11 @@ prob_daily_refueling = Node('prob of daily refueling', 0.25,
 ### Grid
 conn_matrix = Node('connectivity matrix', 
     description='cell ij indicates actor[i] receives power from actor[j]')
-demand_matrix = Node('demand matrix', 
+demand_vector = Node('demand vector', 
     description='desired state for each actor on the grid')
 state_matrix = Node('state matrix', 
     description='state from each actor on the grid')
-total_load = Node('total_load', description='total power required to run the microgrid')
+# total_load = Node('total_load', description='total power required to run the microgrid')
 islanded_balance = Node('islanded_balance', description='balance of grid sans Utility Grid')
 total_power_balance = Node('total power supplied', 0., 
     description='total balance of power supplied (+) or demanded (-) by grid (W)')
@@ -164,16 +202,20 @@ names = Node('names',
 elapsed_hours = Node('elapsed hours', 0, 
     description='number of hours that have passed during the simulation.')
 start_year = Node('start year', description='starting year for the simulation')
-start_day = Node('start day', description='starting day for the simulation (1-366)')
-start_hour = Node('start hour', 1, description='starting hour for the simulation (1-24)')
+start_day = Node('start day', 
+    description='starting day for the simulation (1-366)')
+start_hour = Node('start hour', 1, 
+    description='starting hour for the simulation (1-24)')
 year = Node('year', description='current year')
 day = Node('day', description='current day of the year (1-366)')
 hour = Node('hour', description='current hour (0-23)')
 hour_idx = Node('hour index', description='current hour of the year (1-8784)')
 num_leapyears = Node('num leapyears', 
     description='number of leapyears encountered during the simulation')
-max_hour_index = Node('max_hour_index', description='maximum hour index for the year')
-is_leapyear = Node('is leapyear', description='true if the current year is a leapyear')
+max_hour_index = Node('max_hour_index', 
+    description='maximum hour index for the year')
+is_leapyear = Node('is leapyear', 
+    description='true if the current year is a leapyear')
 tol = Node('tolerance', 0.5, description='float tolerance to be ignored')
 
 ### Components
@@ -294,13 +336,15 @@ mg.add_edge({'day': day,
 mg.add_edge(year, is_leapyear, Rcalc_year_is_leapyear)
 
 ### Grid
-mg.add_edge({'A': conn_matrix,
-             'B': demand_matrix},
-            state_matrix,
-            rel=Rlinear_solve, 
-            label='solve state matrix',
-            edge_props=['LEVEL', 'DISPOSE_ALL']
-)
+# mg.add_edge({'A': conn_matrix,
+#              'B': demand_vector},
+#             state_matrix,
+#             rel=Rlinear_solve, 
+#             label='solve state matrix',
+#             edge_props=['LEVEL', 'DISPOSE_ALL']
+# )
+mg.add_edge(demand_vector, state_matrix, R.Rfirst) #TODO: removing matrix solving due to singularities
+
 mg.add_edge(state_matrix, 
             total_power_balance, 
             rel=lambda s1, **kwargs : sum(s1),
@@ -377,55 +421,95 @@ for ACTOR in ACTORS:
                                       ACTOR.receiving_from[str(SRC)]})
 
     #### Failures and Load Shedding
+    mg.add_edge({'random_fail': has_random_failure, 
+                 'is_failing': ACTOR.is_failing},
+                ACTOR.is_failing, 
+                index_offset=1,
+                rel=lambda **kw : False,
+                label='set_no_failures',
+                disposable=['is_failing'],
+                via=lambda random_fail, **kw : random_fail is False,
+    )
     mg.add_edge({'is_failing': ACTOR.is_failing,
                  'random_fail': has_random_failure, 
-                 'p': ACTOR.prob_failing},
+                 'p_fail': ACTOR.prob_failing,
+                 'p_fix': ACTOR.prob_fixed},
                 ACTOR.is_failing, 
-                rel=lambda p, **kwargs : p > random.random(), index_offset=1,
-                via=lambda random_fail, is_failing, **kwargs : 
-                    random_fail is True and is_failing is False
-    )
-    mg.add_edge({'is_failing': ACTOR.is_failing,
-                 'p': ACTOR.prob_fixed},
-                ACTOR.is_failing, 
-                rel=lambda p, **kwargs : not (p > random.random()), index_offset=1,
-                via=lambda is_failing, **kwargs : is_failing is True
-    )
-    #TODO: Need a way to specify failures of connectivity (like BUS1/BUS2 line)
-    mg.add_edge({'shedding_list': list_load_shedding,
-                 'name': ACTOR.name}, 
-                ACTOR.is_load_shedding, 
-                rel=lambda shedding_list, name, **kwargs : name in shedding_list
-    )
+                rel=Rdeterming_if_failing,
+                label='determine_if_failing',
+                index_offset=1,
+                disposable=['is_failing'],
+                via=lambda random_fail, **kwargs : random_fail is True,
+    ) #TODO: Need a way to specify failures of connectivity (like BUS1/BUS2 line)
+
+    # mg.add_edge({'shedding_list': list_load_shedding,
+    #              'name': ACTOR.name}, 
+    #             ACTOR.is_load_shedding, 
+    #             rel=lambda shedding_list, name, **kwargs : name in shedding_list,
+    # )
     if ACTOR not in UGs:
-        mg.add_edge({'is_failing': ACTOR.is_failing, 'is_load_shedding': ACTOR.is_load_shedding}, 
-                    ACTOR.is_connected, R.Rnot_any)
+        mg.add_edge({'is_failing': ACTOR.is_failing}, 
+                    ACTOR.is_connected,
+                    R.Rnot_any,
+                    edge_props=['LEVEL', 'DISPOSE_ALL'],
+        )
 
 mg.add_edge(keyed_receiving_nodes | {'names': names, 'key_sep': key_sep},
             conn_matrix, 
             rel=Rform_connectivity_matrix, 
             label='form connectivity matrix',
             disposable=[key for key in keyed_receiving_nodes],
-            index_via=lambda **kwargs : R.Rsame(*[kwargs[key] for key in keyed_receiving_nodes]))
-
-#### Demand matrix
-demand_pairs = {'names': names}
-for i, ACTOR in enumerate(ACTORS):
-    mg.add_edge({'name': ACTOR.name,
-                 'demand': ACTOR.demand}, 
-                ACTOR.demand_pair, 
-                rel=lambda name, demand : R.Rtuple(name, demand), 
-                disposable='demand'
-    )
-    demand_pairs[f's{i}'] = ACTOR.demand_pair
-    
-mg.add_edge(demand_pairs, demand_matrix, 
-            rel=Rform_demand_matrix, 
-            label='form demand matrix', 
-            disposable=[key for key in demand_pairs if key != 'names'],
-            index_via=lambda **kwargs : R.Rsame(*[kwargs[key] for key in demand_pairs 
-                                                  if key != 'names'])
+            index_via=lambda **kwargs : R.Rsame(*[kwargs[key] for key in keyed_receiving_nodes])
 )
+
+#### Demand vector
+actor_lists = [UGs, BUSs, PVs, WINDs, BUILDINGs, GENs, BATTERYs]
+s_dynamic = [[], [], ['supply'], ['supply'], [], [], ['cost']]
+d_dynamic = [[], [], [], [], ['req_demand', 'max_demand'], [], ['benefit', 'max_demand']]
+
+demand_sources, dynamic_sources, i = {}, [], 0
+for ACTORS, s_d, d_d in zip(actor_lists, s_dynamic, d_dynamic):
+    for A in ACTORS:
+        make_supply_tuple_edge(A, s_d)
+        make_demand_tuple_edge(A, d_d)
+
+        i += 1
+        demand_sources[f'demand_tuple{i}'] = A.demand_tuple
+        demand_sources[f'supply_tuple{i}'] = A.supply_tuple
+        if len(s_d) > 0:
+            dynamic_sources.append(f'supply_tuple{i}')
+        if len(d_d) > 0:
+            dynamic_sources.append(f'demand_tuple{i}')
+demand_sources.update({'conn': conn_matrix, 'names': names, 'tol': tol})
+dynamic_sources.append('conn')
+
+mg.add_edge(demand_sources,
+            demand_vector,
+            rel=Rmake_demand_vector,
+            label='make_demand_vector',
+            disposable=dynamic_sources,
+            index_via = lambda **kwargs : 
+                R.Rsame(*[kwargs[key] for key in dynamic_sources if key in kwargs]),
+)
+
+
+# demand_pairs = {'names': names}
+# for i, ACTOR in enumerate(ACTORS):
+#     mg.add_edge({'name': ACTOR.name,
+#                  'demand': ACTOR.demand}, 
+#                 ACTOR.demand_pair, 
+#                 rel=lambda name, demand : R.Rtuple(name, demand), 
+#                 disposable='demand'
+#     )
+#     demand_pairs[f's{i}'] = ACTOR.demand_pair
+
+# mg.add_edge(demand_pairs, demand_matrix, 
+#             rel=Rform_demand_matrix, 
+#             label='form demand matrix', 
+#             disposable=[key for key in demand_pairs if key != 'names'],
+#             index_via=lambda **kwargs : R.Rsame(*[kwargs[key] for key in demand_pairs 
+#                                                   if key != 'names'])
+# )
 
 ### Busses
 for BUS in BUSs:
@@ -434,23 +518,23 @@ for BUS in BUSs:
 ### Utility Grids
 for UG in UGs:
     mg.add_edge({'island': island_mode,
-                 'failing': UG.is_failing,
-                 'load_shedding': UG.is_load_shedding}, 
+                 'failing': UG.is_failing}, 
                 UG.is_connected,
-                rel=R.Rnot_any, disposable='failing'
+                disposable=['failing'],
+                rel=R.Rnot_any,
     )
-    mg.add_edge({'conn': UG.is_connected, 
-                 'load': islanded_balance},
-                UG.demand, 
-                #TODO: This really should be the load of everything connected to the UG
-                rel=lambda conn, load, **kw : abs(load) if conn else 0.,
-                edge_props='LEVEL'
-    )
-    mg.add_edge(UGs.is_connected, 
-                is_islanded, 
-                rel=lambda *args, **kwargs : not any(R.extend(args, kwargs)),
-                edge_props=['LEVEL', 'DISPOSE_ALL']
-    )
+    # mg.add_edge({'conn': UG.is_connected, 
+    #              'load': islanded_balance},
+    #             UG.demand, 
+    #             #TODO: This really should be the load of everything connected to the UG
+    #             rel=lambda conn, load, **kw : abs(load) if conn else 0.,
+    #             edge_props='LEVEL'
+    # )
+mg.add_edge([UG.is_connected for UG in UGs], 
+            is_islanded, 
+            rel=lambda *args, **kwargs : not any(R.extend(args, kwargs)),
+            edge_props=['LEVEL', 'DISPOSE_ALL']
+)
 
 ### Solar
 mg.add_edge(year, sunlight_filename, Rget_solar_filename)
@@ -471,7 +555,8 @@ for PV in PVs:
                  'efficiency': PV.efficiency,
                  'sunlight': sunlight},
                 PV.demand, 
-                rel=Rcalc_solar_demand, 
+                rel=Rcalc_solar_demand,
+                label='calc_solar_demand',
                 disposable=['sunlight', 'conn'],
                 index_via=lambda conn, sunlight, **kw : R.Rsame(conn, sunlight)
     )
@@ -490,14 +575,10 @@ for W in WINDs:
     )
 
 ### Buildings
-mg.add_edge([B.demand for B in BUILDINGs], 
-            total_load, 
-            rel=Rdetermine_load, 
-            edge_props=['LEVEL', 'DISPOSE_ALL']
-)
+
 #TODO: There needs to be a more systematic way of indicating that an actor solves for load_shedding.
-shedding_nodes = {'balance': total_power_balance, 
-                  generate_building_keyword('balance', 'index') : ('balance', 'index')}
+# shedding_nodes = {'balance': total_power_balance, 
+#                   generate_building_keyword('balance', 'index') : ('balance', 'index')}
 for B in BUILDINGs:
     mg.add_edge(B.req_demand, B.max_demand, R.Rfirst)
     
@@ -545,18 +626,18 @@ for B in BUILDINGs:
                 edge_props=['LEVEL', 'DISPOSE_ALL'], 
                 label='calc building demand')
 
-    state_label, priority_label, index_label = [generate_building_keyword(B, s) 
-                                                for s in ['load', 'priority', 'index']]
-    shedding_nodes[state_label] = B.state
-    shedding_nodes[priority_label] = B.priority
-    shedding_nodes[index_label] = (state_label, 'index')
+    # state_label, priority_label, index_label = [generate_building_keyword(B, s) 
+    #                                             for s in ['load', 'priority', 'index']]
+    # shedding_nodes[state_label] = B.state
+    # shedding_nodes[priority_label] = B.priority
+    # shedding_nodes[index_label] = (state_label, 'index')
 
-mg.add_edge(shedding_nodes | {'names': names, 'key_sep': key_sep}, 
-            list_load_shedding, 
-            rel=Rdetermine_load_shedding, 
-            via=Vload_nodes_are_level, 
-            disposable=[generate_building_keyword(B, 'load') for B in BUILDINGs] + ['balance']
-)
+# mg.add_edge(shedding_nodes | {'names': names, 'key_sep': key_sep}, 
+#             list_load_shedding, 
+#             rel=Rdetermine_load_shedding, 
+#             via=Vload_nodes_are_level, 
+#             disposable=[generate_building_keyword(B, 'load') for B in BUILDINGs] + ['balance']
+# )
 
 
 ### Generators
@@ -577,17 +658,17 @@ for G in GENs:
                 G.out_of_fuel, 
                 rel=lambda fl, tol, **kwargs :abs(fl) < tol
     )
-    mg.add_edge({'is_islanded': is_islanded,
-                 'load': total_load, 
-                 'max_out': G.max_output,
-                 'conn': G.is_connected, 
-                 'out_of_fuel': G.out_of_fuel}, 
-                G.demand,
-                rel=Rcalc_generator_demand, label=f'calc demand for {G}',
-                disposable=['is_islanded', 'load', 'conn', 'out_of_fuel'],
-                index_via=lambda is_islanded, load, conn, out_of_fuel, **kw : 
-                          R.Rsame(is_islanded, load, conn, out_of_fuel)
-    )
+    # mg.add_edge({'is_islanded': is_islanded,
+    #              'load': total_load, 
+    #              'max_out': G.max_output,
+    #              'conn': G.is_connected, 
+    #              'out_of_fuel': G.out_of_fuel}, 
+    #             G.demand,
+    #             rel=Rcalc_generator_demand, label=f'calc demand for {G}',
+    #             disposable=['is_islanded', 'load', 'conn', 'out_of_fuel'],
+    #             index_via=lambda is_islanded, load, conn, out_of_fuel, **kw : 
+    #                       R.Rsame(is_islanded, load, conn, out_of_fuel)
+    # )
     mg.add_edge({'init': G.starting_fuel_level, 'max': G.fuel_capacity}, 
                 G.fuel_level, R.Rmin
     )
@@ -606,34 +687,35 @@ for G in GENs:
 
 ### Batteries
 for B in BATTERYs:
-    mg.add_edge({'island': is_islanded, 'load': total_load, 'level': B.charge_level, 
-                 'capacity': B.charge_capacity}, B.is_charging,
-                rel=Rdetermine_battery_is_charging, 
-                label='determine if battery is charging',
-                disposable=['island', 'load'],
-                index_via=lambda island, load, level, **kw : R.Rsame(island, load, level)
-    )
-    mg.add_edge({'is_charging': B.is_charging, 'load': total_load, 
-                 'level':B.charge_level, 'capacity': B.charge_capacity, 
-                 'max_rate': B.max_charge_rate, 'max_output': B.max_output, 
-                 'trickle_prop': batt_trickle}, B.demand, 
-                rel=Rcalc_battery_demand, 
-                label='calc battery demand',
-                disposable=['level', 'is_charging', 'load'],
-                index_via=lambda is_charging, load, level, **kw : 
-                          R.Rsame(is_charging, load, level)
-    )
+    # mg.add_edge({'island': is_islanded, 'load': total_load, 'level': B.charge_level, 
+    #              'capacity': B.charge_capacity}, B.is_charging,
+    #             rel=Rdetermine_battery_is_charging, 
+    #             label='determine if battery is charging',
+    #             disposable=['island', 'load'],
+    #             index_via=lambda island, load, level, **kw : R.Rsame(island, load, level)
+    # )
+    # mg.add_edge({'island': is_islanded, 'is_charging': B.is_charging, 'load': total_load, 
+    #              'level':B.charge_level, 'capacity': B.charge_capacity, 
+    #              'max_rate': B.max_charge_rate, 'max_output': B.max_output, 
+    #              'trickle_prop': batt_trickle}, B.demand, 
+    #             rel=Rcalc_battery_demand, 
+    #             label='calc battery demand',
+    #             disposable=['level', 'is_charging', 'load'],
+    #             index_via=lambda is_charging, load, level, **kw : 
+    #                       R.Rsame(is_charging, load, level)
+    # )
     mg.add_edge({'state': B.state, 'level': B.charge_level, 
                  'max_level': B.charge_capacity, 'eff': B.efficiency}, 
                 B.charge_level, 
                 rel=Rcalc_battery_charge_level, 
                 label='calc battery charge level',
+                disposable=['level', 'state'],
                 index_via=lambda state, level, **kw: R.Rsame(state-1, level)
     )
     mg.add_edge({'level': B.charge_level, 
                  'capacity': B.charge_capacity}, 
                 B.soc,
-                rel=R.Rdivide, 
+                rel=lambda level, capacity, **kw : level / capacity, 
                 edge_props=['LEVEL, DISPOSE_ALL']
     )
     mg.add_edge({'ug_cost': UGs[0].cost, 
@@ -642,6 +724,7 @@ for B in BATTERYs:
                  'capacity': B.charge_capacity, 
                  'factor': B.scarcity_factor}, 
                 B.cost, 
+                disposable=['level'],
                 rel=Rcalc_battery_cost
     )
     mg.add_edge({'ug_cost': UGs[0].cost, 
@@ -649,6 +732,7 @@ for B in BATTERYs:
                  'capacity': B.charge_capacity, 
                  'factor': B.scarcity_factor},
                 B.benefit, 
+                disposable=['level'],
                 rel=Rcalc_battery_benefit,
     )    
     mg.add_edge({'level': B.charge_level,
@@ -656,6 +740,7 @@ for B in BATTERYs:
                  'max_rate': B.max_charge_rate,
                  'trickle_prop': batt_trickle}, 
                 B.max_demand, 
-                rel=R.Rfirst,
+                disposable=['level'],
+                rel=Rcalc_battery_max_demand,
     )
     mg.add_edge(B.max_output, B.supply, R.Rfirst)
