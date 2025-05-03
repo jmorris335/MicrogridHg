@@ -14,7 +14,7 @@ inputs = {
 
 # Debugging options, also set logging_level to 12 or lower
 debug_nodes = {'state_matrix'} if False else None
-debug_edges = {'calc_solar_demand'} if True else None
+debug_edges = {'calc_solar_supply'} if True else None
 
 # Solve for a single node
 t = mg.solve(state_matrix,

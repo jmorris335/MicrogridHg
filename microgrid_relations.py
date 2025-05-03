@@ -147,18 +147,6 @@ def Rform_connectivity_matrix(names: list, key_sep: str, *args, **kwargs)-> np.n
             A[i][j] = 1 if bool(val) else 0
     return A
 
-def Rform_demand_matrix(**kwargs)-> np.ndarray:
-    """Forms the demand (B) matrix where the i-th cell indicates the 
-    demand for object i."""
-    names = kwargs.get('names')
-    demands = {}
-    for value in kwargs.values():
-        if isinstance(value, tuple):
-            name, demand = value
-            demands[name] = demand
-    B = [float(demands.get(name, 0.)) for name in names]
-    return np.array(B)
-
 def Rget_state_from_matrix(x: np.ndarray, name: str, names: list, **kwargs)-> float:
     """Indexes and returns the state of the object in the state matrix."""
     i = names.index(name)
@@ -170,49 +158,6 @@ def Rlinear_solve(A: np.ndarray, B: np.ndarray, **kwargs)-> np.ndarray:
     x = np.linalg.solve(A, B)
     return x
 
-def Rdetermine_load_shedding(names: list, balance: float, key_sep: str, **kwargs)-> list:
-    """Returns a list of objects that are being load shed.
-    
-    Parameters
-    ----------
-    names : list
-        Ordered list of objects.
-    balance : float
-        The total system balance.
-    key_sep : str 
-        String splitting `load` and `priority`.
-    **kwargs : dict
-        - load *(& OBJ)* : str
-            Load of the object split by `key_sep`.
-        - priority *(& OBJ)* : str
-            Priority rating of the object split by `key_sep`.
-    """
-    keyed_args = {}
-    for key, val in kwargs.items():
-        var, OBJ = key.split(key_sep)[:2]
-        if OBJ not in names: continue
-        if OBJ not in keyed_args:
-            keyed_args[OBJ] = {}
-        keyed_args[OBJ].update({var: val})
-
-    vals = [(OBJ, keyed_args[OBJ]['load'], keyed_args[OBJ]['priority']) 
-            for OBJ in keyed_args]
-    vals.sort(key=lambda a : a[-1])
-
-    to_shed = []
-    while balance < 0 and len(vals) > 0:
-        name, load, priority = vals.pop(0)
-        to_shed.append(name)
-        balance += abs(load)
-    
-    return to_shed
-
-def Vload_nodes_are_level(key_sep: str, **kwargs)-> bool:
-    """Returns true if all the indices for the load nodes are the same."""
-    load_node_indices = {kwargs[kw] for kw in kwargs 
-                         if kw.split(key_sep)[0] == 'index'}
-    return len(load_node_indices) == 1
-
 def Rdeterming_if_failing(is_failing: bool, p_fail: float, p_fix: float, 
                           *args, **kwargs)-> bool:
     """Returns true if the actor is failing."""
@@ -221,6 +166,17 @@ def Rdeterming_if_failing(is_failing: bool, p_fail: float, p_fix: float,
         return p > p_fail
     return not (p > p_fix)
 
+def Rget_failing_actors(names: list, *args, **kwargs)-> list:
+    """Returns a list of actors that are failing, where kwargs are of the 
+    form ``{label : is_failing}."""
+    failing = [kwargs.get(name, False) for name in names]
+    return failing
+
+def Rdetermine_if_loadshedding(state: float, req_demand: float, tol: float)-> bool:
+    """Determines if the actor was required to be load shed from the grid."""
+    if req_demand > tol:
+        return state > tol
+    return False
 
 ## Utility Grid
 def Rcalc_ug_demand(conn: bool, islanded_balance: float, *args, **kwargs)-> float:
@@ -243,7 +199,7 @@ def Rget_solar_filename(year: str, **kwargs)-> str:
     out += '.csv'
     return out
 
-def Rcalc_solar_demand(conn: bool, area: float, efficiency: float, 
+def Rcalc_solar_supply(conn: bool, area: float, efficiency: float, 
                        sunlight: float, **kwargs)-> float:
     """Calculates the power (in kW) produced by a photovoltaic cell over one hour."""
     # if not conn:
@@ -279,7 +235,6 @@ def Rdetermine_building_load(conn: bool, normal: float, critical: float,
     if not conn:
         return 0.0
     load = critical if island else normal
-    load = -load
     return load
 
 ## Generators

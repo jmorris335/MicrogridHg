@@ -375,11 +375,6 @@ class Building(GridActor):
             kwargs.get('equipment_col_name', 'InteriorEquipment:Electricity [kW](Hourly)'),
             description='name of column with equipment loads in building data'
         )
-        self.priority = Node(
-            f'priority_{name}',
-            kwargs.get('priority', 0.),
-            description='priority rating of building, with higher being more critical'
-        )
         super().__init__(name, output=0., **kwargs)
 
 ## Modes
