@@ -1,5 +1,8 @@
 # Microgrid Constraint Hypergraph
 
+[![DOI](https://zenodo.org/badge/962999862.svg)](https://doi.org/10.5281/zenodo.15447062)
+
+
 This model describes the behavior of a microgrid, formalized in a constraint hypergraph.
 
 <h1 align="center">
@@ -19,6 +22,8 @@ This package has been released under the MIT license. Though not
 required by the license, if you do end up using this package or making 
 changes we would love to hear about it! Please reach out via our GitHub 
 profiles.
+
+**To know more about Constraint Hypergraphs visit https://constrainthg.readthedocs.io/en/latest/chg_overview.html**
 
 ## Overview
 The default configuration of the microgrid consists of 12 actors of 5 
