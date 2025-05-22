@@ -1,6 +1,7 @@
 dev/
 .vscode/
 validation/
+plothg*
 
 *.log
 
