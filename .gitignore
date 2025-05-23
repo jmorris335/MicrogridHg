@@ -1,6 +1,6 @@
 dev/
 .vscode/
-validation/
+info_sheets/
 plothg*
 
 *.log

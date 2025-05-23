@@ -4,7 +4,7 @@ import csv
 import numpy as np
 import logging
 
-from microgrid_actors import *
+from model.microgrid_actors import *
 
 #TODO: We shouldn't be passing information by node IDs, this should be implemented with tuples
 KEY_SEP = '¦&¦' #A unique constant for seperating strings in paired keywordss
@@ -89,9 +89,14 @@ def Rcalc_year_is_leapyear(year: int, **kwargs)-> bool:
     is_leapyear = year % 4 == 0
     return is_leapyear
 
+def Rcalc_elapsed_minutes(elapsed_hours: int, **kwargs)-> int:
+    """Returns the number of minutes passed in the simulation."""
+    minutes = elapsed_hours * 60
+    return minutes
+
 
 ### Data
-def Rget_data_from_csv_file(filename: str, **kwargs):
+def Rget_data_from_csv_file(filename: str, **kwargs)-> list:
     """Converts a CSV file to a list of dictionaries."""
     with open(filename, newline='') as file:
         reader = csv.DictReader(file)
@@ -99,11 +104,6 @@ def Rget_data_from_csv_file(filename: str, **kwargs):
     return data
 
 def Rget_float_from_csv_data(csv_data: dict, row, col, **kwargs):
-    """Returns the value in the row and column from the CSV dict reader."""
-    value = float(csv_data[row][col])
-    return value
-
-def Rget_load_from_building_data(csv_data: dict, row, col, **kwargs):
     """Returns the value in the row and column from the CSV dict reader."""
     value = float(csv_data[row][col])
     return value
@@ -188,14 +188,14 @@ def Rcalc_ug_demand(conn: bool, islanded_balance: float, *args, **kwargs)-> floa
 
 
 ## Solar
-def Rget_solar_filename(year: str, **kwargs)-> str:
+def Rget_solar_filename(directory: str, year: str, **kwargs)-> str:
     """Returns the name of the CSV file with the solar data 
     corresponding to the given year."""
-    out = 'solar_data/724915'
-    if year == 0 or str(year).upper() == 'TY':
-        out += 'TY'
-    else:
+    out = f'{directory}/724915'
+    if year >= 2000 and year <= 2009:
         out += f'_{year}_solar'
+    else:
+        out += 'TY'
     out += '.csv'
     return out
 
@@ -217,10 +217,10 @@ def Rcalc_wind_supply(area: float, power_coef: float, velocity: float,
     return supply
 
 ## Buildings
-def Rget_building_filename(building_type: BUILDING_TYPE, **kwargs)-> str:
+def Rget_building_filename(directory: str, building_type: BUILDING_TYPE, **kwargs)-> str:
     """Returns the name of the CSV file with the load data corresponding to the 
     building type."""
-    out = f'building_data/RefBldg{building_type.value}New2004_7-1_5-0_3C_USA_CA_SAN_FRANCISCO.csv'
+    out = f'{directory}/RefBldg{building_type.value}New2004_7-1_5-0_3C_USA_CA_SAN_FRANCISCO.csv'
     return out
 
 def Rcalc_critical_load(lights: float, equipment: float, **kwargs)-> float:

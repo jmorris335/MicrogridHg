@@ -1,47 +1,28 @@
+"""This is a digital twin of for the Spanagel Rooftop Microgrid, a benchtop 
+microgrid installed at the Naval Postgraduate School in Monterrey, CA.
+
+Comparative test results come from a run from Apr 29 through 
+May 1st, 2025.
+"""
+import sys, os
+sys.path.append('.')
+
 from constrainthg import Node, Hypergraph
 import constrainthg.relations as R
 import random
 
-from microgrid_actors import *
-from microgrid_relations import *
+from src.model.microgrid_actors import *
+from src.model.microgrid_relations import *
 
 random.seed(3)
 
-mg = Hypergraph(no_weights=True)
-
-## ----- Actors ----- ##
-### Initialize Actors
-UGs = [
-    GridActor(
-        name='UtilityGrid', 
-        is_load_shedding=False,
-        benefit=0.4,
-        cost=0.13,
-        req_demand=0.,
-        max_demand=120.,
-        supply=20000.,
-    )
-]
-
-BUSs = [Bus('Bus1'), Bus('Bus2')]
+valid_mg = Hypergraph(no_weights=True)
 
 PVs = [
     PhotovoltaicArray(
         name='PV1', 
-        area=8000,
-        efficiency=.18,
         cost=0.02,
     )
-]
-
-WINDs = [
-    #TODO: Wind speed and density data need to be supplied
-    # WindTurbine(
-    #     name='Wind1',
-    #     rotor_area=3800.,
-    #     power_coef=0.36,
-    #     cost=0.05,
-    # )
 ]
 
 GENs = [
@@ -50,18 +31,21 @@ GENs = [
         fuel_capacity=28., 
         starting_fuel_level=28., 
         max_output=7., 
-    ), 
-    Generator(
-        name='Generator2', 
-        fuel_capacity=2500., 
-        starting_fuel_level=2500., 
-        max_output=100., 
-    ), 
+    ),
 ]
 
 BATTERYs = [
     Battery(
-        name='Battery1', 
+        name='BatteryString1', 
+        charge_capacity=10000.,
+        charge_level=10000., 
+        max_output=350.,
+        efficiency=0.45,
+        max_charge_rate=2.,
+        scarcity_factor=1.5,
+    ),
+    Battery(
+        name='BatteryString2', 
         charge_capacity=10000.,
         charge_level=10000., 
         max_output=350.,
@@ -73,11 +57,25 @@ BATTERYs = [
 
 BUILDINGs = [
     Building('Building1Small', BUILDING_TYPE.SMALL, benefit=10),
-    Building('Building2Small', BUILDING_TYPE.SMALL, benefit=15),
-    Building('Building3Medium', BUILDING_TYPE.MEDIUM, benefit=61),
-    Building('Building4Large', BUILDING_TYPE.LARGE, benefit=93),
-    Building('Building5Warehouse', BUILDING_TYPE.WAREHOUSE, benefit=74),
 ]
+
+BUSs = [
+    Bus('Bus1')
+]
+
+UGs, WINDs = [], []
+
+## Nodes
+valid_data_path = Node('validation_data_path')
+valid_data = Node('validation_data')
+time_column = Node('time_data_column', 1)
+pv_column = Node('pv_data_column', 9)
+
+
+#####################################################
+# DEFAULT MICROGRID MODEL
+#####################################################
+
 
 ACTORS = GENs + BATTERYs + UGs + BUSs + PVs + BUILDINGs + WINDs
 
@@ -87,15 +85,9 @@ for ACTOR in ACTORS: #Set default as not connected
     for SRC in ACTORS:
         ACTOR.add_source(SRC, SRC is ACTOR)
 
-bus0 = UGs + GENs + WINDs + [BUILDINGs[i] for i in [0, 3, 4]] + [BUSs[1]]
-bus1 = BATTERYs + PVs + [b for b in set(BUILDINGs).difference(bus0)] + [BUSs[0]]
-
-for SRC in bus0:
+for SRC in ACTORS:
     BUSs[0].add_source(SRC, True)
     SRC.add_source(BUSs[0], True)
-for SRC in bus1:
-    BUSs[1].add_source(SRC, True)
-    SRC.add_source(BUSs[1], True)
 
 def make_demand_tuple_edge(ACTOR: GridActor, dynamic: list):
     """Convenience function for making the demand tuple edge.
@@ -105,7 +97,7 @@ def make_demand_tuple_edge(ACTOR: GridActor, dynamic: list):
     (Issue #1) Otherwise we need to make a index_via/disposal method for 
     each object since some treat these nodes statically, while others do not.
     """
-    mg.add_edge({'label': ACTOR.name,
+    valid_mg.add_edge({'label': ACTOR.name,
                  'benefit': ACTOR.benefit,
                  'req_demand': ACTOR.req_demand,
                  'max_demand': ACTOR.max_demand},
@@ -118,7 +110,7 @@ def make_demand_tuple_edge(ACTOR: GridActor, dynamic: list):
     
 def make_supply_tuple_edge(ACTOR: GridActor, dynamic: list):
     """Convenience function for making the supply tuple edge."""
-    mg.add_edge({'label': ACTOR.name,
+    valid_mg.add_edge({'label': ACTOR.name,
                  'cost': ACTOR.cost,
                  'supply': ACTOR.supply},
                 target=ACTOR.supply_tuple,
@@ -181,6 +173,8 @@ names = Node('names',
 ### Simulation
 elapsed_hours = Node('elapsed hours', 0, 
     description='number of hours that have passed during the simulation.')
+elapsed_minutes = Node('elapsed_minutes', 0,
+    description='number of minutes that have passed during the simulation.')
 start_year = Node('start year', description='starting year for the simulation')
 start_day = Node('start day', 
     description='starting day for the simulation (1-366)')
@@ -228,38 +222,38 @@ failing_actors = Node('failing_actors',
 
 ## ----- Edges ----- ##
 ### Simulation
-mg.add_edge(days_in_year, days_in_leapyear, lambda s1, **kw : s1 + 1)
+valid_mg.add_edge(days_in_year, days_in_leapyear, lambda s1, **kw : s1 + 1)
 
-mg.add_edge({'days':days_in_year,
+valid_mg.add_edge({'days':days_in_year,
              'hours':hours_in_day},
             target=hours_in_year,
             rel=R.Rmultiply,
             )
-mg.add_edge({'days':days_in_leapyear,
+valid_mg.add_edge({'days':days_in_leapyear,
              'hours':hours_in_day}, 
             target=hours_in_leapyear,
             rel=R.Rmultiply
             )
-mg.add_edge({'use_rand_date': use_random_date,
+valid_mg.add_edge({'use_rand_date': use_random_date,
              'min_year': min_year,
              'max_year': max_year},
             target=start_year, 
             rel=Rget_random_year,
             via=lambda use_rand_date, **kwargs : use_rand_date
             )
-mg.add_edge({'random': use_random_date,
+valid_mg.add_edge({'random': use_random_date,
              'days_in_year': days_in_year},
             target=start_day, 
             rel=Rget_random_day,
             via=lambda random, **kw : random is True
             )
-mg.add_edge({'random': use_random_date,
+valid_mg.add_edge({'random': use_random_date,
              'hours_in_day': hours_in_day},
             target=start_hour, 
             rel=Rget_random_hour,
             via=lambda random, **kw : random is True
             )
-mg.add_edge({'start_year': start_year,
+valid_mg.add_edge({'start_year': start_year,
              'elapsed_hours': elapsed_hours, 
              'hours_in_year': hours_in_year,
              'hours_in_leapyear': hours_in_leapyear}, 
@@ -267,9 +261,9 @@ mg.add_edge({'start_year': start_year,
             rel=Rcalc_num_leapyears,
             label='calc_num_leapyears',
             )
-mg.add_edge(elapsed_hours, elapsed_hours, R.Rincrement, index_offset=1)
+valid_mg.add_edge(elapsed_hours, elapsed_hours, R.Rincrement, index_offset=1)
 
-mg.add_edge({'elapsed_hours': elapsed_hours,
+valid_mg.add_edge({'elapsed_hours': elapsed_hours,
              'start_year': start_year, 
              'num_leapyears': num_leapyears,
              'start_day': start_day, 
@@ -282,7 +276,7 @@ mg.add_edge({'elapsed_hours': elapsed_hours,
             index_via=lambda elapsed_hours, num_leapyears, **kw :
                        R.Rsame(elapsed_hours, num_leapyears)
             )
-mg.add_edge({'elapsed_hours': elapsed_hours,
+valid_mg.add_edge({'elapsed_hours': elapsed_hours,
              'start_year': start_year, 
              'year': year,
              'num_leapyears': num_leapyears,
@@ -296,13 +290,13 @@ mg.add_edge({'elapsed_hours': elapsed_hours,
             index_via=lambda elapsed_hours, year, **kw : 
                       R.Rsame(elapsed_hours, year)
             )
-mg.add_edge({'elapsed_hours': elapsed_hours,
+valid_mg.add_edge({'elapsed_hours': elapsed_hours,
              'start_hour': start_hour, 
              'hours_in_day': hours_in_day},
             target=hour,
             rel=Rcalc_hour,
             )
-mg.add_edge({'day': day,
+valid_mg.add_edge({'day': day,
              'hour': hour,
              'is_leapyear': is_leapyear, 
              'hours_in_year': hours_in_year,
@@ -314,63 +308,56 @@ mg.add_edge({'day': day,
             index_via=lambda day, hour, is_leapyear, **kw : 
                       R.Rsame(day, hour, is_leapyear)
             )
-mg.add_edge(year, is_leapyear, Rcalc_year_is_leapyear)
+valid_mg.add_edge(year, is_leapyear, Rcalc_year_is_leapyear)
 
 ### Grid
-# mg.add_edge({'A': conn_matrix,
-#              'B': demand_vector},
-#             target=state_matrix,
-#             rel=Rlinear_solve, 
-#             label='solve state matrix',
-#             edge_props=['LEVEL', 'DISPOSE_ALL']
-# )
-mg.add_edge(demand_vector, state_matrix, R.Rfirst) #TODO: removing matrix solving due to singularities
+valid_mg.add_edge(demand_vector, state_matrix, R.Rfirst)
 
-mg.add_edge(state_matrix, 
+valid_mg.add_edge(state_matrix, 
             target=total_power_balance, 
             rel=lambda s1, **kwargs : sum(s1),
             index_offset=1
             )
-mg.add_edge({'wasted': power_wasted,
+valid_mg.add_edge({'wasted': power_wasted,
              'balance': total_power_balance},
             target=power_wasted, 
             rel=lambda wasted, balance, **kwargs : wasted + min(0., balance), 
             index_offset=1,
             edge_props=['LEVEL', 'DISPOSE_ALL']
             )
-mg.add_edge(state_matrix,
+valid_mg.add_edge(state_matrix,
             target=num_loads, 
             rel=lambda s1, **kw : sum([a > 0 for a in s1]),
             )
-mg.add_edge({'l': list_load_shedding,
+valid_mg.add_edge({'l': list_load_shedding,
              'num': num_loads},
             target=all_loads_shed, 
             rel=lambda l, num, **kwargs : len(l) >= num
             )
 
 ### Actors
-mg.add_edge([A.state for A in ACTORS if A not in UGs], 
+valid_mg.add_edge([A.state for A in ACTORS if A not in UGs], 
             target=islanded_balance,
             rel=R.Rsum, 
             label='calc_island_balance',
             edge_props=['LEVEL', 'DISPOSE_ALL'],
             )
-mg.add_edge({str(A) : A.is_failing for A in ACTORS} | {'names': names},
+valid_mg.add_edge({str(A) : A.is_failing for A in ACTORS} | {'names': names},
             target=failing_actors,
             rel=lambda *args, **kw : args,
             disposable=[str(A) for A in ACTORS],
             index_via=lambda *ar, **kw : R.Rsame(*[str(A) for A in ACTORS]),
             )
-mg.add_edge({A.name for A in ACTORS}, names, Rsort_names)
+valid_mg.add_edge({A.name for A in ACTORS}, names, Rsort_names)
 
 keyed_receiving_nodes = {}
 for ACTOR in ACTORS:
     #### Power Flow
-    mg.add_edge(ACTOR.is_connected, ACTOR.state, 
+    valid_mg.add_edge(ACTOR.is_connected, ACTOR.state, 
                 rel=lambda **kwargs : 0., 
                 via=lambda s1, **kwargs : s1 is False
                 )
-    mg.add_edge({'x': state_matrix,
+    valid_mg.add_edge({'x': state_matrix,
                  'name': ACTOR.name,
                  'names': names}, 
                 target=ACTOR.state, 
@@ -379,7 +366,7 @@ for ACTOR in ACTORS:
                 )
     for SRC in ACTORS:
         if SRC is ACTOR:
-            mg.add_edge({'receives_from': ACTOR.receives_from[str(SRC)], 
+            valid_mg.add_edge({'receives_from': ACTOR.receives_from[str(SRC)], 
                          'is_conn': ACTOR.is_connected}, 
                         target=ACTOR.receiving_from[str(SRC)], 
                         rel=lambda receives_from, is_conn, **kwargs : 
@@ -388,7 +375,7 @@ for ACTOR in ACTORS:
                         label=f'{str(ACTOR)} receiving from itself',
                         )
         else:
-            mg.add_edge({'receives_from': ACTOR.receives_from[str(SRC)], 
+            valid_mg.add_edge({'receives_from': ACTOR.receives_from[str(SRC)], 
                          'receiver_conn': ACTOR.is_connected, 
                          'provider_conn': SRC.is_connected}, 
                         target=ACTOR.receiving_from[str(SRC)], 
@@ -402,7 +389,7 @@ for ACTOR in ACTORS:
                                       ACTOR.receiving_from[str(SRC)]})
 
     #### Failures and Load Shedding
-    mg.add_edge({'random_fail': has_random_failure, 
+    valid_mg.add_edge({'random_fail': has_random_failure, 
                  'is_failing': ACTOR.is_failing},
                 target=ACTOR.is_failing, 
                 index_offset=1,
@@ -411,7 +398,7 @@ for ACTOR in ACTORS:
                 disposable=['is_failing'],
                 via=lambda random_fail, **kw : random_fail is False,
                 )
-    mg.add_edge({'is_failing': ACTOR.is_failing,
+    valid_mg.add_edge({'is_failing': ACTOR.is_failing,
                  'random_fail': has_random_failure, 
                  'p_fail': ACTOR.prob_failing,
                  'p_fix': ACTOR.prob_fixed},
@@ -423,7 +410,7 @@ for ACTOR in ACTORS:
                 via=lambda random_fail, **kwargs : random_fail is True,
                 ) #TODO: Need a way to specify failures of connectivity (like BUS1/BUS2 line)
 
-    mg.add_edge({'req_demand': ACTOR.req_demand,
+    valid_mg.add_edge({'req_demand': ACTOR.req_demand,
                  'state': ACTOR.state,
                  'tol': tol},
                  target=ACTOR.is_load_shedding,
@@ -433,13 +420,13 @@ for ACTOR in ACTORS:
                             R.Rsame(req_demand, state),
                 )
     if ACTOR not in UGs:
-        mg.add_edge({'is_failing': ACTOR.is_failing}, 
+        valid_mg.add_edge({'is_failing': ACTOR.is_failing}, 
                     ACTOR.is_connected,
                     R.Rnot_any,
                     edge_props=['LEVEL', 'DISPOSE_ALL'],
                     )
 
-mg.add_edge(keyed_receiving_nodes | {'names': names, 'key_sep': key_sep},
+valid_mg.add_edge(keyed_receiving_nodes | {'names': names, 'key_sep': key_sep},
             target=conn_matrix, 
             rel=Rform_connectivity_matrix, 
             label='form connectivity matrix',
@@ -468,7 +455,7 @@ for ACTORS, s_d, d_d in zip(actor_lists, s_dynamic, d_dynamic):
 demand_sources.update({'conn': conn_matrix, 'names': names, 'tol': tol})
 dynamic_sources.append('conn')
 
-mg.add_edge(demand_sources,
+valid_mg.add_edge(demand_sources,
             target=demand_vector,
             rel=Rmake_demand_vector,
             label='make_demand_vector',
@@ -477,16 +464,14 @@ mg.add_edge(demand_sources,
                 R.Rsame(*[kwargs[key] for key in dynamic_sources if key in kwargs]),
             )
 
-### Busses
-
 ### Utility Grids
-mg.add_edge([UG.is_connected for UG in UGs], 
+valid_mg.add_edge([UG.is_connected for UG in UGs], 
             target=is_islanded, 
             rel=lambda *args, **kwargs : not any(R.extend(args, kwargs)),
             edge_props=['LEVEL', 'DISPOSE_ALL']
             )
 for UG in UGs:
-    mg.add_edge({'island': island_mode,
+    valid_mg.add_edge({'island': island_mode,
                  'failing': UG.is_failing}, 
                 target=UG.is_connected,
                 disposable=['failing'],
@@ -494,11 +479,11 @@ for UG in UGs:
                 )
 
 ### Solar
-mg.add_edge(year, sunlight_filename, Rget_solar_filename)
+valid_mg.add_edge(year, sunlight_filename, Rget_solar_filename)
 
-mg.add_edge(sunlight_filename, sunlight_data, Rget_data_from_csv_file)
+valid_mg.add_edge(sunlight_filename, sunlight_data, Rget_data_from_csv_file)
 
-mg.add_edge({'csv_data': sunlight_data,
+valid_mg.add_edge({'csv_data': sunlight_data,
              'row': hour_idx,
              'col': sunlight_data_label}, 
             target=sunlight,
@@ -507,7 +492,7 @@ mg.add_edge({'csv_data': sunlight_data,
             disposable=['csv_data', 'row']
             )
 for PV in PVs:
-    mg.add_edge({'conn': PV.is_connected,
+    valid_mg.add_edge({'conn': PV.is_connected,
                  'area': PV.area,
                  'efficiency': PV.efficiency,
                  'sunlight': sunlight},
@@ -520,7 +505,7 @@ for PV in PVs:
     
 ### Wind
 for W in WINDs:
-    mg.add_edge({'area': W.rotor_area, 
+    valid_mg.add_edge({'area': W.rotor_area, 
                  'power_coef': W.power_coef, 
                  'velocity': wind_speed,
                  'density': air_density}, 
@@ -532,38 +517,38 @@ for W in WINDs:
 
 ### Buildings
 for B in BUILDINGs:
-    mg.add_edge(B.req_demand, B.max_demand, R.Rfirst)
+    valid_mg.add_edge(B.req_demand, B.max_demand, R.Rfirst)
         
-    mg.add_edge(B.type, B.building_filename, Rget_building_filename)
+    valid_mg.add_edge(B.type, B.building_filename, Rget_building_filename)
 
-    mg.add_edge(B.building_filename, B.load_data, Rget_data_from_csv_file)
+    valid_mg.add_edge(B.building_filename, B.load_data, Rget_data_from_csv_file)
 
-    mg.add_edge({'csv_data': B.load_data,
+    valid_mg.add_edge({'csv_data': B.load_data,
                  'row': hour_idx,
                  'col': B.normal_col_name}, 
                 target=B.normal_load,
-                rel=Rget_load_from_building_data
+                rel=Rget_float_from_csv_data
                 )
-    mg.add_edge({'csv_data': B.load_data, 
+    valid_mg.add_edge({'csv_data': B.load_data, 
                  'row': hour_idx, 
                  'col': B.lights_col_name}, 
                 target=B.lights_load,
-                rel=Rget_load_from_building_data
+                rel=Rget_float_from_csv_data
                 )
-    mg.add_edge({'csv_data': B.load_data, 
+    valid_mg.add_edge({'csv_data': B.load_data, 
                  'row': hour_idx, 
                  'col': B.equipment_col_name}, 
                 target=B.equipment_load, 
-                rel=Rget_load_from_building_data
+                rel=Rget_float_from_csv_data
                 )
-    mg.add_edge({'lights': B.lights_load,
+    valid_mg.add_edge({'lights': B.lights_load,
                  'equipment': B.equipment_load},
                 target=B.critical_load,
                 rel=Rcalc_critical_load,
                 edge_props=['LEVEL', 'DISPOSE_ALL']
                 )
     #TODO: Need to implement a way for the critical load to be passed as well.
-    mg.add_edge({'conn': B.is_connected, 
+    valid_mg.add_edge({'conn': B.is_connected, 
                  'normal': B.normal_load, 
                  'critical': B.critical_load,
                  'island': is_islanded}, 
@@ -575,7 +560,7 @@ for B in BUILDINGs:
 
 
 ### Generators
-mg.add_edge({'refuel_time': next_refuel_hour,
+valid_mg.add_edge({'refuel_time': next_refuel_hour,
              'curr_hour': hour_idx, 
              'prob': prob_daily_refueling,
              'hours_in_day': hours_in_day}, 
@@ -588,17 +573,17 @@ mg.add_edge({'refuel_time': next_refuel_hour,
             )
 i = 0
 for G in GENs:
-    mg.add_edge({'fl': G.fuel_level, 
+    valid_mg.add_edge({'fl': G.fuel_level, 
                  'tol': tol}, 
                 target=G.out_of_fuel, 
                 rel=lambda fl, tol, **kwargs :abs(fl) < tol
                 )
-    mg.add_edge({'init': G.starting_fuel_level, 
+    valid_mg.add_edge({'init': G.starting_fuel_level, 
                  'max': G.fuel_capacity}, 
                 G.fuel_level, 
                 R.Rmin,
                 )
-    mg.add_edge({'refuel_time': next_refuel_hour, 
+    valid_mg.add_edge({'refuel_time': next_refuel_hour, 
                  'curr_hour': hour_idx, 
                  'curr_level': G.fuel_level,
                  'max_level': G.fuel_capacity}, 
@@ -609,7 +594,7 @@ for G in GENs:
                 index_via=lambda refuel_time, curr_hour, curr_level, **kw : 
                           R.Rsame(refuel_time, curr_hour, curr_level)
                 )
-    mg.add_edge({'load': G.state,
+    valid_mg.add_edge({'load': G.state,
                  'max_load': G.max_output},
                 target=G.consumption,
                 rel=Rcalc_generator_fuel_consumption,
@@ -617,28 +602,28 @@ for G in GENs:
                 )
     
     #Added in response to Issue #6 in ConstraintHg regarding resolving duplicate nodes
-    mg.add_edge(G.max_output, f'max_output{GENs.index(G)}', R.Rfirst)
-    mg.add_edge({'load': f'max_output{GENs.index(G)}',
+    valid_mg.add_edge(G.max_output, f'max_output{GENs.index(G)}', R.Rfirst)
+    valid_mg.add_edge({'load': f'max_output{GENs.index(G)}',
                  'max_load': G.max_output},
                 target=G.max_consumption,
                 rel=Rcalc_generator_fuel_consumption,
                 )
-    mg.add_edge({'fuel_cost': cost_of_diesel,
+    valid_mg.add_edge({'fuel_cost': cost_of_diesel,
                  'output': G.max_output,
                  'consumption': G.max_consumption},
                 target=G.cost,
                 rel=Rcalc_generator_cost,
                 )
-    mg.add_edge(G.max_output, G.supply, R.Rfirst)
+    valid_mg.add_edge(G.max_output, G.supply, R.Rfirst)
 
 
 ### Batteries
 for B in BATTERYs:
-    mg.add_edge(B.state, B.is_charging, lambda s1, **kw : s1 < 0)
+    valid_mg.add_edge(B.state, B.is_charging, lambda s1, **kw : s1 < 0)
 
-    mg.add_edge(B.max_output, B.supply, R.Rfirst)
+    valid_mg.add_edge(B.max_output, B.supply, R.Rfirst)
 
-    mg.add_edge({'state': B.state, 'level': B.charge_level, 
+    valid_mg.add_edge({'state': B.state, 'level': B.charge_level, 
                  'max_level': B.charge_capacity, 'eff': B.efficiency}, 
                 target=B.charge_level, 
                 rel=Rcalc_battery_charge_level, 
@@ -646,13 +631,13 @@ for B in BATTERYs:
                 disposable=['level', 'state'],
                 index_via=lambda state, level, **kw: R.Rsame(state-1, level)
                 )
-    mg.add_edge({'level': B.charge_level, 
+    valid_mg.add_edge({'level': B.charge_level, 
                  'capacity': B.charge_capacity}, 
                 target=B.soc,
                 rel=lambda level, capacity, **kw : level / capacity, 
                 edge_props=['LEVEL, DISPOSE_ALL']
                 )
-    mg.add_edge({'ug_cost': UGs[0].cost, 
+    valid_mg.add_edge({'ug_cost': UGs[0].cost, 
                  'tol': tol, 
                  'level': B.charge_level, 
                  'capacity': B.charge_capacity, 
@@ -661,7 +646,7 @@ for B in BATTERYs:
                 disposable=['level'],
                 rel=Rcalc_battery_cost
                 )
-    mg.add_edge({'ug_cost': UGs[0].cost, 
+    valid_mg.add_edge({'ug_cost': UGs[0].cost, 
                  'level': B.charge_level, 
                  'capacity': B.charge_capacity, 
                  'factor': B.scarcity_factor},
@@ -669,7 +654,7 @@ for B in BATTERYs:
                 disposable=['level'],
                 rel=Rcalc_battery_benefit,
                 )    
-    mg.add_edge({'level': B.charge_level,
+    valid_mg.add_edge({'level': B.charge_level,
                  'capacity': B.charge_capacity,
                  'max_rate': B.max_charge_rate,
                  'trickle_prop': batt_trickle}, 
@@ -677,3 +662,45 @@ for B in BATTERYs:
                 disposable=['level'],
                 rel=Rcalc_battery_max_demand,
                 )
+
+
+###################################################
+# END DEFAULT MICROGRID MODEL
+###################################################
+
+## Edges
+valid_mg.add_edge(valid_data_path, valid_data, Rget_data_from_csv_file)
+
+valid_mg.add_edge(elapsed_hours, elapsed_minutes, Rcalc_elapsed_minutes)
+
+valid_mg.add_edge({'csv_data': valid_data_path,
+             'row': elapsed_minutes,
+             'col': pv_column}, 
+            target=PVs[0].state,
+            rel=Rget_data_from_csv_file,
+            disposable=['row'])
+
+
+
+inputs = {
+    valid_data_path: 'validation/Spanagel_Test_29APR-1MAY2025.csv',
+    use_random_date: False,
+    start_day: 100,
+    start_year: 2004,
+    start_hour: 9,
+    has_random_failure: False,
+    island_mode: True,
+}
+
+
+# Solve for a single node
+t = valid_mg.solve(
+            target=state_matrix,
+            # target=GENs[0].max_consumption,
+            inputs=inputs, min_index=3, 
+            search_depth=3000, to_print=False,
+            logging_level=logging.INFO)
+if t is not None:
+    print(t.value)
+else:
+    print("No solutions found")

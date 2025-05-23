@@ -1,5 +1,5 @@
-from microgrid import *
-from plotter import *
+from model.microgrid import *
+from aux.plotter import *
 import logging
 
 # Inputs
