@@ -102,8 +102,8 @@ def make_demand_tuple_edge(ACTOR: GridActor, dynamic: list):
     
     #TODO: This function is provided for convenience. Eventually there 
     needs to be a way to specify disposal doesn't affect input nodes. 
-    Otherwise we need to make a index_via/disposal method for each 
-    object since some treat these nodes statically, while others do not.
+    (Issue #1) Otherwise we need to make a index_via/disposal method for 
+    each object since some treat these nodes statically, while others do not.
     """
     mg.add_edge({'label': ACTOR.name,
                  'benefit': ACTOR.benefit,
