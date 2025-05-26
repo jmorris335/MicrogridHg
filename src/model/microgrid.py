@@ -71,6 +71,7 @@ BATTERYs = [
         efficiency=0.45,
         max_charge_rate=2.,
         scarcity_factor=1.5,
+        trickle_prop=0.8,
     ),
 ]
 
@@ -700,7 +701,8 @@ for B in BATTERYs:
     mg.add_edge({'level': B.charge_level,
                  'capacity': B.charge_capacity,
                  'max_rate': B.max_charge_rate,
-                 'trickle_prop': batt_trickle}, 
+                 'trickle_prop': B.trickle_prop,
+                 'trickle_rate': batt_trickle}, 
                 target=B.max_demand, 
                 disposable=['level'],
                 rel=Rcalc_battery_max_demand,

@@ -36,11 +36,12 @@ BATTERYs = [
     Battery(
         name='BatteryString1', 
         charge_capacity=9.,
-        charge_level=1, 
+        charge_level=0, 
         max_output=350.,
         efficiency=0.45,
         max_charge_rate=float('inf'),
         scarcity_factor=1.5,
+        trickle_prop=0.9,
     ),
     Battery(
         name='BatteryString2', 
@@ -50,12 +51,13 @@ BATTERYs = [
         efficiency=0.45,
         max_charge_rate=float('inf'),
         scarcity_factor=1.5,
+        trickle_prop=0.9,
     ),
 ]
 
 LOADs = [
     Load(name='TestLoad',
-         benefit=10,
+         benefit=100,
     ),
 ]
 
@@ -64,15 +66,15 @@ BUSs = [
 ]
 
 UGs = [
-    GridActor(
-        name='UtilityGrid', 
-        is_load_shedding=False,
-        benefit=0.4,
-        cost=0.13,
-        req_demand=0.,
-        max_demand=0.,
-        supply=0.,
-    )
+    # GridActor(
+    #     name='UtilityGrid', 
+    #     is_load_shedding=False,
+    #     benefit=0.0,
+    #     cost=0.13,
+    #     req_demand=0.,
+    #     max_demand=0.,
+    #     supply=0.,
+    # )
 ]
 
 WINDs, BUILDINGs = [], [
@@ -680,27 +682,28 @@ for B in BATTERYs:
                 rel=lambda level, capacity, **kw : level / capacity, 
                 edge_props=['LEVEL, DISPOSE_ALL']
                 )
-    sg.add_edge({'ug_cost': UGs[0].cost, 
-                 'tol': tol, 
-                 'level': B.charge_level, 
-                 'capacity': B.charge_capacity, 
-                 'factor': B.scarcity_factor}, 
-                target=B.cost, 
-                disposable=['level'],
-                rel=Rcalc_battery_cost
-                )
-    sg.add_edge({'ug_cost': UGs[0].cost, 
-                 'level': B.charge_level, 
-                 'capacity': B.charge_capacity, 
-                 'factor': B.scarcity_factor},
-                target=B.benefit, 
-                disposable=['level'],
-                rel=Rcalc_battery_benefit,
-                )    
+    # mg.add_edge({'ug_cost': UGs[0].cost, 
+    #              'tol': tol, 
+    #              'level': B.charge_level, 
+    #              'capacity': B.charge_capacity, 
+    #              'factor': B.scarcity_factor}, 
+    #             target=B.cost, 
+    #             disposable=['level'],
+    #             rel=Rcalc_battery_cost
+    #             )
+    # mg.add_edge({'ug_cost': UGs[0].cost, 
+    #              'level': B.charge_level, 
+    #              'capacity': B.charge_capacity, 
+    #              'factor': B.scarcity_factor},
+    #             target=B.benefit, 
+    #             disposable=['level'],
+    #             rel=Rcalc_battery_benefit,
+    #             )    
     sg.add_edge({'level': B.charge_level,
                  'capacity': B.charge_capacity,
                  'max_rate': B.max_charge_rate,
-                 'trickle_prop': batt_trickle}, 
+                 'trickle_prop': B.trickle_prop,
+                 'trickle_rate': batt_trickle}, 
                 target=B.max_demand, 
                 disposable=['level'],
                 rel=Rcalc_battery_max_demand,
@@ -710,6 +713,26 @@ for B in BATTERYs:
 ###################################################
 # END DEFAULT MICROGRID MODEL
 ###################################################
+
+## Relationships
+def Rcalc_battery_cost_spanagel(is_charging: bool, trickle_prop: float, 
+                                tol: float, level: float, capacity: float):
+    """Calculate the cost of using the battery."""
+    if level <= tol:
+        return float('inf')
+    if level > capacity * trickle_prop:
+        return 0.1
+    elif level < capacity * 0.5:
+        return 100
+    elif is_charging:
+        return 50
+    return 0.1
+
+def Rcalc_battery_benefit_spanagel(level: float, capacity:float, **kwargs):
+    """Calculate the benefit of charging the battery."""
+    if level >= capacity:
+        return 0.0
+    return 0.001
 
 ## Edges
 sg.add_edge(valid_data_path, valid_data, Rget_data_from_csv_file)
@@ -734,4 +757,25 @@ for L in LOADs:
                 target=L.normal_load,
                 rel=Rget_float_from_csv_data,
                 disposable=['row'],
+                )
+    
+    sg.add_edge(L.normal_load, L.req_demand, R.Rfirst)
+    
+for B in BATTERYs:
+    sg.add_edge({'is_charging': B.is_charging, 
+                 'trickle_prop': B.trickle_prop,
+                 'tol': tol, 
+                 'level': B.charge_level, 
+                 'capacity': B.charge_capacity}, 
+                target=B.cost, 
+                rel=Rcalc_battery_cost_spanagel,
+                label='calc_battery_cost',
+                disposable=['level', 'is_charging'],
+                index_via=lambda level, is_charging, **kw : R.Rsame(level, is_charging)
+                )
+    sg.add_edge({'level': B.charge_level, 
+                 'capacity': B.charge_capacity},
+                target=B.benefit, 
+                disposable=['level'],
+                rel=Rcalc_battery_benefit_spanagel,
                 )

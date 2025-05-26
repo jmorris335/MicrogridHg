@@ -195,7 +195,8 @@ class Battery(GridActor):
     def __init__(self, name: str, charge_level: float=None, 
                  charge_capacity: float=None, max_output: float=None, 
                  efficiency: float=None, max_charge_rate: float=None, 
-                 scarcity_factor: float=None, **kwargs):
+                 scarcity_factor: float=None, trickle_prop: float=None, 
+                 **kwargs):
         defaults = dict(
             req_demand = 0.,
             )
@@ -238,9 +239,14 @@ class Battery(GridActor):
             scarcity_factor,
             description='cost gain based on using an increasingly depleted battery'
             )
+        self.trickle_prop = Node(
+            f'trickle_prop_{name}',
+            trickle_prop,
+            description='SOC to reduce to trickle charge'
+        )
         self.is_charging = Node(
             f'{name} is charging',
-            kwargs.get('is_charging', None),
+            kwargs.get('is_charging', False),
             description='true if battery is set for charging'
             )
         self.soc = Node(

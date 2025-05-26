@@ -286,23 +286,6 @@ def Rcalc_generator_cost(fuel_cost: float, output: float, consumption: float,
     return cost
 
 ## Batteries
-def Rcalc_battery_demand(island: bool, is_charging: bool, load: float, 
-                         level: float, capacity: float, max_rate: float, 
-                         max_output: float, trickle_prop: float, **kwargs)-> float:
-    """Calculates the demand of the battery."""
-    if load < 0 and not island:
-        highest_output = min(max_output, level)
-        demand = max(0, min(abs(load), highest_output))
-    elif is_charging:
-        if level > 0.8 * capacity:
-            demand = trickle_prop * max_rate
-        else:
-            demand = max_rate
-        demand = -demand
-    else:
-        demand = 0
-    return demand
-
 def Rdetermine_battery_is_charging(island: bool, load: float, level: float, 
                                    capacity: float, **kwargs)-> bool:
     """Determines if the battery should be charging or not."""
@@ -318,7 +301,7 @@ def Rcalc_battery_charge_level(state: float, level: float, max_level: float,
     return new_level
 
 def Rcalc_battery_cost(ug_cost: float, tol: float, level: float, 
-                       capacity: float, factor: float):
+                       capacity: float, factor: float, **kwargs):
     """Calculate the cost of using the battery."""
     if level <= tol:
         return float('inf')
@@ -326,7 +309,8 @@ def Rcalc_battery_cost(ug_cost: float, tol: float, level: float,
     cost = ug_cost + (ug_cost * level_factor)
     return cost
 
-def Rcalc_battery_benefit(ug_cost: float, level: float, capacity:float, factor: float):
+def Rcalc_battery_benefit(ug_cost: float, level: float, capacity:float, factor: float,
+                          **kwargs):
     """Calculate the benefit of charging the battery."""
     if level >= capacity:
         return 0.
@@ -335,10 +319,11 @@ def Rcalc_battery_benefit(ug_cost: float, level: float, capacity:float, factor: 
     return benefit
 
 def Rcalc_battery_max_demand(level: float, capacity: float, max_rate: float, 
-                             trickle_prop: float, **kwargs)-> float:
+                             trickle_prop: float, trickle_rate: float, 
+                             **kwargs)-> float:
     """Calculates the maximum power the battery can receive."""
-    if level > 0.8 * capacity:
-        demand = trickle_prop * max_rate
+    if level > trickle_prop * capacity:
+        demand = trickle_rate * max_rate
     else:
         demand = max_rate
     demand = -abs(demand)
@@ -381,16 +366,16 @@ def Rmake_demand_vector(conn: list, names: list, tol: float,
 
     Notes
     -----
-    The power distribution strategy cannot account for non-independent 
+    The power distribution strategy cannot account for a dependent 
     grid circuit, and will default to skipping the smallest dependent 
     circuit encountered. A set of dependent circuits are circuits that 
-    each contain the same grid actor(s). In this case, the distribution 
-    strategy will produce conflicting states for the shared actors, so 
-    the default behavior is to take the most viable strategy (affecting 
-    the most nodes) and neglecting the other circuits (setting them to 
-    zero). This will effectively disconnect actors that are only 
-    connected to a neglected circuit to prevent them from being set to a
-    conflicting state.
+    share a grid actor(s). In this case, the distribution strategy will 
+    produce conflicting states for the shared actors, so the default 
+    behavior is to take the most viable strategy (affecting the most 
+    nodes) and neglecting the other circuits (setting them to zero). 
+    This will effectively disconnect actors that are only connected to a
+    neglected circuit to prevent them from being set to a conflicting 
+    state.
     """
     supply_tuples, demand_tuples, states = [], [], {}
     for key, val in kwargs.items():

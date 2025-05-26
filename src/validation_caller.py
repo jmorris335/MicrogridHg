@@ -10,18 +10,18 @@ inputs = {
     start_year: 2025,
     start_hour: 15,
     has_random_failure: False,
-    island_mode: True,
+    time_step: 3600,
 }
 
 # Debugging options, also set logging_level to 12 or lower
 debug_nodes = {'state_matrix'} if False else None
-debug_edges = {'make_demand_vector'} if True else None
+debug_edges = {'make_demand_vector'} if False else None
 
 # Solve for a single node
 t = sg.solve(target=state_matrix,
              inputs=inputs,
              min_index=0, 
-             search_depth=500, to_print=False,
+             search_depth=2000, to_print=False,
              debug_nodes=debug_nodes, debug_edges=debug_edges, 
              logging_level=logging.INFO)
 
