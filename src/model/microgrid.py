@@ -461,9 +461,9 @@ mg.add_edge(keyed_receiving_nodes | {'names': names, 'key_sep': key_sep},
             )
 
 #### Demand vector
-actor_lists = [UGs, BUSs, PVs, WINDs, BUILDINGs, GENs, BATTERYs]
-s_dynamic = [[], [], ['supply'], ['supply'], [], [], ['cost']]
-d_dynamic = [[], [], [], [], ['req_demand', 'max_demand'], [], ['benefit', 'max_demand']]
+actor_lists = [UGs, BUSs, PVs, WINDs, LOADs, BUILDINGs, GENs, BATTERYs]
+s_dynamic = [[], [], ['supply'], ['supply'], [], [], [], ['cost']]
+d_dynamic = [[], [], [], [], ['req_demand', 'max_demand'], ['req_demand', 'max_demand'], [], ['benefit', 'max_demand']]
 
 demand_sources, dynamic_sources, i = {}, [], 0
 for ACTORS, s_d, d_d in zip(actor_lists, s_dynamic, d_dynamic):
@@ -574,19 +574,22 @@ for B in BUILDINGs:
                  'row': hour_idx,
                  'col': B.normal_col_name}, 
                 target=B.normal_load,
-                rel=Rget_float_from_csv_data
+                rel=Rget_float_from_csv_data,
+                disposable=['row'],
                 )
     mg.add_edge({'csv_data': B.load_data, 
                  'row': hour_idx, 
                  'col': B.lights_col_name}, 
                 target=B.lights_load,
-                rel=Rget_float_from_csv_data
+                rel=Rget_float_from_csv_data,
+                disposable=['row'],
                 )
     mg.add_edge({'csv_data': B.load_data, 
                  'row': hour_idx, 
                  'col': B.equipment_col_name}, 
                 target=B.equipment_load, 
-                rel=Rget_float_from_csv_data
+                rel=Rget_float_from_csv_data,
+                disposable=['row'],
                 )
     mg.add_edge({'lights': B.lights_load,
                  'equipment': B.equipment_load},

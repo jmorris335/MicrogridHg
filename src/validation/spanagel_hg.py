@@ -54,8 +54,8 @@ BATTERYs = [
 ]
 
 LOADs = [
-    GridActor(name='TestLoad',
-              benefit=10,
+    Load(name='TestLoad',
+         benefit=10,
     ),
 ]
 
@@ -75,7 +75,9 @@ UGs = [
     )
 ]
 
-WINDs, BUILDINGs = [], []
+WINDs, BUILDINGs = [], [
+    # Building('test', BUILDING_TYPE.SMALL, benefit=10)
+]
 
 ACTORS = GENs + BATTERYs + UGs + BUSs + PVs + BUILDINGs + WINDs + LOADs
 
@@ -93,6 +95,7 @@ valid_data_path = Node('validation_data_path')
 valid_data = Node('validation_data')
 time_column = Node('time_data_column', 1)
 pv_power_label = Node('pv_power_label', 'Solar Power (kW)')
+load_label = Node('node_label', 'Powerload (kW)')
 
 
 
@@ -459,9 +462,9 @@ sg.add_edge(keyed_receiving_nodes | {'names': names, 'key_sep': key_sep},
             )
 
 #### Demand vector
-actor_lists = [UGs, BUSs, PVs, WINDs, BUILDINGs, GENs, BATTERYs]
-s_dynamic = [[], [], ['supply'], ['supply'], [], [], ['cost']]
-d_dynamic = [[], [], [], [], ['req_demand', 'max_demand'], [], ['benefit', 'max_demand']]
+actor_lists = [UGs, BUSs, PVs, WINDs, LOADs, BUILDINGs, GENs, BATTERYs]
+s_dynamic = [[], [], ['supply'], ['supply'], [], [], [], ['cost']]
+d_dynamic = [[], [], [], [], ['req_demand', 'max_demand'], ['req_demand', 'max_demand'], [], ['benefit', 'max_demand']]
 
 demand_sources, dynamic_sources, i = {}, [], 0
 for ACTORS, s_d, d_d in zip(actor_lists, s_dynamic, d_dynamic):
@@ -711,8 +714,20 @@ sg.add_edge(elapsed_hours, elapsed_minutes, Rcalc_elapsed_minutes)
 
 for PV in PVs:
     sg.add_edge({'csv_data': valid_data,
-                'row': elapsed_minutes,
-                'col': pv_power_label}, 
+                 'row': elapsed_minutes,
+                 'col': pv_power_label}, 
                 target=PV.supply,
                 rel=Rget_float_from_csv_data,
-                disposable=['row'])
+                disposable=['row'],
+                )
+    
+for L in LOADs:
+    sg.add_edge(L.normal_load, L.critical_load, R.Rfirst)
+
+    sg.add_edge({'csv_data': valid_data,
+                 'row': elapsed_minutes,
+                 'col': load_label}, 
+                target=L.normal_load,
+                rel=Rget_float_from_csv_data,
+                disposable=['row'],
+                )
