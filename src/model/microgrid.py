@@ -366,9 +366,11 @@ mg.add_edge([A.state for A in ACTORS if A not in UGs],
             )
 mg.add_edge({str(A) : A.is_failing for A in ACTORS} | {'names': names},
             target=failing_actors,
-            rel=lambda *args, **kw : args,
+            rel=Rget_failing_actors,
+            label='get_failing_actors',
             disposable=[str(A) for A in ACTORS],
-            index_via=lambda *ar, **kw : R.Rsame(*[str(A) for A in ACTORS]),
+            index_via=lambda *ar, **kwargs : R.Rsame(*[val for key,val in kwargs.items() 
+                                                       if key != 'names']),
             )
 mg.add_edge({A.name for A in ACTORS}, names, Rsort_names)
 

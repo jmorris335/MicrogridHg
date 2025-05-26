@@ -13,8 +13,9 @@ from model.microgrid_relations import *
 
 random.seed(3)
 
-shg = Hypergraph(no_weights=True)
+sg = Hypergraph(no_weights=True)
 
+## Nodes
 PVs = [
     PhotovoltaicArray(
         name='PV1', 
@@ -74,22 +75,9 @@ UGs = [
 
 WINDs = []
 
-## Nodes
-valid_data_path = Node('validation_data_path')
-valid_data = Node('validation_data')
-time_column = Node('time_data_column', 1)
-pv_column = Node('pv_data_column', 9)
-
-
-#####################################################
-# DEFAULT MICROGRID MODEL
-#####################################################
-
-
 ACTORS = GENs + BATTERYs + UGs + BUSs + PVs + BUILDINGs + WINDs
 
 ### Connectivity
-#### Receivers (set which actors are wired to receive power from which other actors)
 for ACTOR in ACTORS: #Set default as not connected
     for SRC in ACTORS:
         ACTOR.add_source(SRC, SRC is ACTOR)
@@ -97,6 +85,18 @@ for ACTOR in ACTORS: #Set default as not connected
 for SRC in ACTORS:
     BUSs[0].add_source(SRC, True)
     SRC.add_source(BUSs[0], True)
+
+### Other nodes
+valid_data_path = Node('validation_data_path')
+valid_data = Node('validation_data')
+time_column = Node('time_data_column', 1)
+pv_power_label = Node('pv_power_label', 'Solar Power (kW)')
+
+
+
+#####################################################
+# DEFAULT MICROGRID MODEL
+#####################################################
 
 def make_demand_tuple_edge(ACTOR: GridActor, dynamic: list):
     """Convenience function for making the demand tuple edge.
@@ -106,7 +106,7 @@ def make_demand_tuple_edge(ACTOR: GridActor, dynamic: list):
     (Issue #1) Otherwise we need to make a index_via/disposal method for 
     each object since some treat these nodes statically, while others do not.
     """
-    shg.add_edge({'label': ACTOR.name,
+    sg.add_edge({'label': ACTOR.name,
                  'benefit': ACTOR.benefit,
                  'req_demand': ACTOR.req_demand,
                  'max_demand': ACTOR.max_demand},
@@ -119,7 +119,7 @@ def make_demand_tuple_edge(ACTOR: GridActor, dynamic: list):
     
 def make_supply_tuple_edge(ACTOR: GridActor, dynamic: list):
     """Convenience function for making the supply tuple edge."""
-    shg.add_edge({'label': ACTOR.name,
+    sg.add_edge({'label': ACTOR.name,
                  'cost': ACTOR.cost,
                  'supply': ACTOR.supply},
                 target=ACTOR.supply_tuple,
@@ -214,8 +214,6 @@ sunlight_filename = Node('sunlight_filename',
     description='filename for sunlight csv file')
 sunlight_data_label = Node('sunlight_data_label', 'SUNY Dir (Wh/m^2)', 
     description='name of column for sunlight data')
-sunlight_power_label = Node('sunlight_power_label', 'Solar Power (kW)',
-    description='name of column for measured solar power produced')
 wind_speed = Node('wind_speed', 
     description='average wind speed over the last hour', units='m/s')
 air_density = Node('air_density', 
@@ -237,38 +235,38 @@ failing_actors = Node('failing_actors',
 
 ## ----- Edges ----- ##
 ### Simulation
-shg.add_edge(days_in_year, days_in_leapyear, lambda s1, **kw : s1 + 1)
+sg.add_edge(days_in_year, days_in_leapyear, lambda s1, **kw : s1 + 1)
 
-shg.add_edge({'days':days_in_year,
+sg.add_edge({'days':days_in_year,
              'hours':hours_in_day},
             target=hours_in_year,
             rel=R.Rmultiply,
             )
-shg.add_edge({'days':days_in_leapyear,
+sg.add_edge({'days':days_in_leapyear,
              'hours':hours_in_day}, 
             target=hours_in_leapyear,
             rel=R.Rmultiply
             )
-shg.add_edge({'use_rand_date': use_random_date,
+sg.add_edge({'use_rand_date': use_random_date,
              'min_year': min_year,
              'max_year': max_year},
             target=start_year, 
             rel=Rget_random_year,
             via=lambda use_rand_date, **kwargs : use_rand_date
             )
-shg.add_edge({'random': use_random_date,
+sg.add_edge({'random': use_random_date,
              'days_in_year': days_in_year},
             target=start_day, 
             rel=Rget_random_day,
             via=lambda random, **kw : random is True
             )
-shg.add_edge({'random': use_random_date,
+sg.add_edge({'random': use_random_date,
              'hours_in_day': hours_in_day},
             target=start_hour, 
             rel=Rget_random_hour,
             via=lambda random, **kw : random is True
             )
-shg.add_edge({'start_year': start_year,
+sg.add_edge({'start_year': start_year,
              'elapsed_hours': elapsed_hours, 
              'hours_in_year': hours_in_year,
              'hours_in_leapyear': hours_in_leapyear}, 
@@ -276,9 +274,9 @@ shg.add_edge({'start_year': start_year,
             rel=Rcalc_num_leapyears,
             label='calc_num_leapyears',
             )
-shg.add_edge(elapsed_hours, elapsed_hours, R.Rincrement, index_offset=1)
+sg.add_edge(elapsed_hours, elapsed_hours, R.Rincrement, index_offset=1)
 
-shg.add_edge({'elapsed_hours': elapsed_hours,
+sg.add_edge({'elapsed_hours': elapsed_hours,
              'start_year': start_year, 
              'num_leapyears': num_leapyears,
              'start_day': start_day, 
@@ -291,7 +289,7 @@ shg.add_edge({'elapsed_hours': elapsed_hours,
             index_via=lambda elapsed_hours, num_leapyears, **kw :
                        R.Rsame(elapsed_hours, num_leapyears)
             )
-shg.add_edge({'elapsed_hours': elapsed_hours,
+sg.add_edge({'elapsed_hours': elapsed_hours,
              'start_year': start_year, 
              'year': year,
              'num_leapyears': num_leapyears,
@@ -305,13 +303,13 @@ shg.add_edge({'elapsed_hours': elapsed_hours,
             index_via=lambda elapsed_hours, year, **kw : 
                       R.Rsame(elapsed_hours, year)
             )
-shg.add_edge({'elapsed_hours': elapsed_hours,
+sg.add_edge({'elapsed_hours': elapsed_hours,
              'start_hour': start_hour, 
              'hours_in_day': hours_in_day},
             target=hour,
             rel=Rcalc_hour,
             )
-shg.add_edge({'day': day,
+sg.add_edge({'day': day,
              'hour': hour,
              'is_leapyear': is_leapyear, 
              'hours_in_year': hours_in_year,
@@ -323,56 +321,65 @@ shg.add_edge({'day': day,
             index_via=lambda day, hour, is_leapyear, **kw : 
                       R.Rsame(day, hour, is_leapyear)
             )
-shg.add_edge(year, is_leapyear, Rcalc_year_is_leapyear)
+sg.add_edge(year, is_leapyear, Rcalc_year_is_leapyear)
 
 ### Grid
-shg.add_edge(demand_vector, state_matrix, R.Rfirst)
+# shg.add_edge({'A': conn_matrix,
+#              'B': demand_vector},
+#             target=state_matrix,
+#             rel=Rlinear_solve, 
+#             label='solve state matrix',
+#             edge_props=['LEVEL', 'DISPOSE_ALL']
+# )
+sg.add_edge(demand_vector, state_matrix, R.Rfirst) #TODO: removing matrix solving due to singularities
 
-shg.add_edge(state_matrix, 
+sg.add_edge(state_matrix, 
             target=total_power_balance, 
             rel=lambda s1, **kwargs : sum(s1),
             index_offset=1
             )
-shg.add_edge({'wasted': power_wasted,
+sg.add_edge({'wasted': power_wasted,
              'balance': total_power_balance},
             target=power_wasted, 
             rel=lambda wasted, balance, **kwargs : wasted + min(0., balance), 
             index_offset=1,
             edge_props=['LEVEL', 'DISPOSE_ALL']
             )
-shg.add_edge(state_matrix,
+sg.add_edge(state_matrix,
             target=num_loads, 
             rel=lambda s1, **kw : sum([a > 0 for a in s1]),
             )
-shg.add_edge({'l': list_load_shedding,
+sg.add_edge({'l': list_load_shedding,
              'num': num_loads},
             target=all_loads_shed, 
             rel=lambda l, num, **kwargs : len(l) >= num
             )
 
 ### Actors
-shg.add_edge([A.state for A in ACTORS if A not in UGs], 
+sg.add_edge([A.state for A in ACTORS if A not in UGs], 
             target=islanded_balance,
             rel=R.Rsum, 
             label='calc_island_balance',
             edge_props=['LEVEL', 'DISPOSE_ALL'],
             )
-# shg.add_edge({str(A) : A.is_failing for A in ACTORS} | {'names': names},
-#             target=failing_actors,
-#             rel=lambda *args, **kw : args,
-#             disposable=[str(A) for A in ACTORS],
-#             index_via=lambda *ar, **kw : R.Rsame(*[str(A) for A in ACTORS]),
-#             )
-shg.add_edge({A.name for A in ACTORS}, names, Rsort_names)
+sg.add_edge({str(A) : A.is_failing for A in ACTORS} | {'names': names},
+            target=failing_actors,
+            rel=Rget_failing_actors,
+            label='get_failing_actors',
+            disposable=[str(A) for A in ACTORS],
+            index_via=lambda *ar, **kwargs : R.Rsame(*[val for key,val in kwargs.items() 
+                                                       if key != 'names']),
+            )
+sg.add_edge({A.name for A in ACTORS}, names, Rsort_names)
 
 keyed_receiving_nodes = {}
 for ACTOR in ACTORS:
     #### Power Flow
-    shg.add_edge(ACTOR.is_connected, ACTOR.state, 
+    sg.add_edge(ACTOR.is_connected, ACTOR.state, 
                 rel=lambda **kwargs : 0., 
                 via=lambda s1, **kwargs : s1 is False
                 )
-    shg.add_edge({'x': state_matrix,
+    sg.add_edge({'x': state_matrix,
                  'name': ACTOR.name,
                  'names': names}, 
                 target=ACTOR.state, 
@@ -381,7 +388,7 @@ for ACTOR in ACTORS:
                 )
     for SRC in ACTORS:
         if SRC is ACTOR:
-            shg.add_edge({'receives_from': ACTOR.receives_from[str(SRC)], 
+            sg.add_edge({'receives_from': ACTOR.receives_from[str(SRC)], 
                          'is_conn': ACTOR.is_connected}, 
                         target=ACTOR.receiving_from[str(SRC)], 
                         rel=lambda receives_from, is_conn, **kwargs : 
@@ -390,7 +397,7 @@ for ACTOR in ACTORS:
                         label=f'{str(ACTOR)} receiving from itself',
                         )
         else:
-            shg.add_edge({'receives_from': ACTOR.receives_from[str(SRC)], 
+            sg.add_edge({'receives_from': ACTOR.receives_from[str(SRC)], 
                          'receiver_conn': ACTOR.is_connected, 
                          'provider_conn': SRC.is_connected}, 
                         target=ACTOR.receiving_from[str(SRC)], 
@@ -404,7 +411,7 @@ for ACTOR in ACTORS:
                                       ACTOR.receiving_from[str(SRC)]})
 
     #### Failures and Load Shedding
-    shg.add_edge({'random_fail': has_random_failure, 
+    sg.add_edge({'random_fail': has_random_failure, 
                  'is_failing': ACTOR.is_failing},
                 target=ACTOR.is_failing, 
                 index_offset=1,
@@ -413,7 +420,7 @@ for ACTOR in ACTORS:
                 disposable=['is_failing'],
                 via=lambda random_fail, **kw : random_fail is False,
                 )
-    shg.add_edge({'is_failing': ACTOR.is_failing,
+    sg.add_edge({'is_failing': ACTOR.is_failing,
                  'random_fail': has_random_failure, 
                  'p_fail': ACTOR.prob_failing,
                  'p_fix': ACTOR.prob_fixed},
@@ -425,7 +432,7 @@ for ACTOR in ACTORS:
                 via=lambda random_fail, **kwargs : random_fail is True,
                 )
 
-    shg.add_edge({'req_demand': ACTOR.req_demand,
+    sg.add_edge({'req_demand': ACTOR.req_demand,
                  'state': ACTOR.state,
                  'tol': tol},
                  target=ACTOR.is_load_shedding,
@@ -435,13 +442,13 @@ for ACTOR in ACTORS:
                             R.Rsame(req_demand, state),
                 )
     if ACTOR not in UGs:
-        shg.add_edge({'is_failing': ACTOR.is_failing}, 
+        sg.add_edge({'is_failing': ACTOR.is_failing}, 
                     ACTOR.is_connected,
                     R.Rnot_any,
                     edge_props=['LEVEL', 'DISPOSE_ALL'],
                     )
 
-shg.add_edge(keyed_receiving_nodes | {'names': names, 'key_sep': key_sep},
+sg.add_edge(keyed_receiving_nodes | {'names': names, 'key_sep': key_sep},
             target=conn_matrix, 
             rel=Rform_connectivity_matrix, 
             label='form connectivity matrix',
@@ -470,7 +477,7 @@ for ACTORS, s_d, d_d in zip(actor_lists, s_dynamic, d_dynamic):
 demand_sources.update({'conn': conn_matrix, 'names': names, 'tol': tol})
 dynamic_sources.append('conn')
 
-shg.add_edge(demand_sources,
+sg.add_edge(demand_sources,
             target=demand_vector,
             rel=Rmake_demand_vector,
             label='make_demand_vector',
@@ -479,14 +486,16 @@ shg.add_edge(demand_sources,
                 R.Rsame(*[kwargs[key] for key in dynamic_sources if key in kwargs]),
             )
 
+### Busses
+
 ### Utility Grids
-shg.add_edge([UG.is_connected for UG in UGs], 
+sg.add_edge([UG.is_connected for UG in UGs], 
             target=is_islanded, 
             rel=lambda *args, **kwargs : not any(R.extend(args, kwargs)),
             edge_props=['LEVEL', 'DISPOSE_ALL']
             )
 for UG in UGs:
-    shg.add_edge({'island': island_mode,
+    sg.add_edge({'island': island_mode,
                  'failing': UG.is_failing}, 
                 target=UG.is_connected,
                 disposable=['failing'],
@@ -494,14 +503,15 @@ for UG in UGs:
                 )
 
 ### Solar
-shg.add_edge({'directory': sunlight_directory,
+sg.add_edge({'directory': sunlight_directory,
              'year': year}, 
             sunlight_filename, 
-            Rget_solar_filename)
+            Rget_solar_filename,
+            )
 
-shg.add_edge(sunlight_filename, sunlight_data, Rget_data_from_csv_file)
+# shg.add_edge(sunlight_filename, sunlight_data, Rget_data_from_csv_file)
 
-shg.add_edge({'csv_data': sunlight_data,
+sg.add_edge({'csv_data': sunlight_data,
              'row': hour_idx,
              'col': sunlight_data_label}, 
             target=sunlight,
@@ -509,8 +519,9 @@ shg.add_edge({'csv_data': sunlight_data,
             index_via=lambda csv_data, row, **kw: R.Rsame(csv_data, row), 
             disposable=['csv_data', 'row']
             )
+
 for PV in PVs:
-    shg.add_edge({'conn': PV.is_connected,
+    sg.add_edge({'conn': PV.is_connected,
                  'area': PV.area,
                  'efficiency': PV.efficiency,
                  'sunlight': sunlight},
@@ -523,7 +534,7 @@ for PV in PVs:
     
 ### Wind
 for W in WINDs:
-    shg.add_edge({'area': W.rotor_area, 
+    sg.add_edge({'area': W.rotor_area, 
                  'power_coef': W.power_coef, 
                  'velocity': wind_speed,
                  'density': air_density}, 
@@ -535,41 +546,41 @@ for W in WINDs:
 
 ### Buildings
 for B in BUILDINGs:
-    shg.add_edge(B.req_demand, B.max_demand, R.Rfirst)
+    sg.add_edge(B.req_demand, B.max_demand, R.Rfirst)
         
-    shg.add_edge({'directory': load_directory,
-                  'building_type': B.type},
+    sg.add_edge({'directory': load_directory,
+                 'building_type': B.type},
                 B.building_filename,
                 Rget_building_filename)
 
-    shg.add_edge(B.building_filename, B.load_data, Rget_data_from_csv_file)
+    sg.add_edge(B.building_filename, B.load_data, Rget_data_from_csv_file)
 
-    shg.add_edge({'csv_data': B.load_data,
+    sg.add_edge({'csv_data': B.load_data,
                  'row': hour_idx,
                  'col': B.normal_col_name}, 
                 target=B.normal_load,
                 rel=Rget_float_from_csv_data
                 )
-    shg.add_edge({'csv_data': B.load_data, 
+    sg.add_edge({'csv_data': B.load_data, 
                  'row': hour_idx, 
                  'col': B.lights_col_name}, 
                 target=B.lights_load,
                 rel=Rget_float_from_csv_data
                 )
-    shg.add_edge({'csv_data': B.load_data, 
+    sg.add_edge({'csv_data': B.load_data, 
                  'row': hour_idx, 
                  'col': B.equipment_col_name}, 
                 target=B.equipment_load, 
                 rel=Rget_float_from_csv_data
                 )
-    shg.add_edge({'lights': B.lights_load,
+    sg.add_edge({'lights': B.lights_load,
                  'equipment': B.equipment_load},
                 target=B.critical_load,
                 rel=Rcalc_critical_load,
                 edge_props=['LEVEL', 'DISPOSE_ALL']
                 )
     #TODO: Need to implement a way for the critical load to be passed as well.
-    shg.add_edge({'conn': B.is_connected, 
+    sg.add_edge({'conn': B.is_connected, 
                  'normal': B.normal_load, 
                  'critical': B.critical_load,
                  'island': is_islanded}, 
@@ -581,7 +592,7 @@ for B in BUILDINGs:
 
 
 ### Generators
-shg.add_edge({'refuel_time': next_refuel_hour,
+sg.add_edge({'refuel_time': next_refuel_hour,
              'curr_hour': hour_idx, 
              'prob': prob_daily_refueling,
              'hours_in_day': hours_in_day}, 
@@ -594,17 +605,17 @@ shg.add_edge({'refuel_time': next_refuel_hour,
             )
 i = 0
 for G in GENs:
-    shg.add_edge({'fl': G.fuel_level, 
+    sg.add_edge({'fl': G.fuel_level, 
                  'tol': tol}, 
                 target=G.out_of_fuel, 
                 rel=lambda fl, tol, **kwargs :abs(fl) < tol
                 )
-    shg.add_edge({'init': G.starting_fuel_level, 
+    sg.add_edge({'init': G.starting_fuel_level, 
                  'max': G.fuel_capacity}, 
                 G.fuel_level, 
                 R.Rmin,
                 )
-    shg.add_edge({'refuel_time': next_refuel_hour, 
+    sg.add_edge({'refuel_time': next_refuel_hour, 
                  'curr_hour': hour_idx, 
                  'curr_level': G.fuel_level,
                  'max_level': G.fuel_capacity}, 
@@ -615,7 +626,7 @@ for G in GENs:
                 index_via=lambda refuel_time, curr_hour, curr_level, **kw : 
                           R.Rsame(refuel_time, curr_hour, curr_level)
                 )
-    shg.add_edge({'load': G.state,
+    sg.add_edge({'load': G.state,
                  'max_load': G.max_output},
                 target=G.consumption,
                 rel=Rcalc_generator_fuel_consumption,
@@ -623,28 +634,28 @@ for G in GENs:
                 )
     
     #Added in response to Issue #6 in ConstraintHg regarding resolving duplicate nodes
-    shg.add_edge(G.max_output, f'max_output{GENs.index(G)}', R.Rfirst)
-    shg.add_edge({'load': f'max_output{GENs.index(G)}',
+    sg.add_edge(G.max_output, f'max_output{GENs.index(G)}', R.Rfirst)
+    sg.add_edge({'load': f'max_output{GENs.index(G)}',
                  'max_load': G.max_output},
                 target=G.max_consumption,
                 rel=Rcalc_generator_fuel_consumption,
                 )
-    shg.add_edge({'fuel_cost': cost_of_diesel,
+    sg.add_edge({'fuel_cost': cost_of_diesel,
                  'output': G.max_output,
                  'consumption': G.max_consumption},
                 target=G.cost,
                 rel=Rcalc_generator_cost,
                 )
-    shg.add_edge(G.max_output, G.supply, R.Rfirst)
+    sg.add_edge(G.max_output, G.supply, R.Rfirst)
 
 
 ### Batteries
 for B in BATTERYs:
-    shg.add_edge(B.state, B.is_charging, lambda s1, **kw : s1 < 0)
+    sg.add_edge(B.state, B.is_charging, lambda s1, **kw : s1 < 0)
 
-    shg.add_edge(B.max_output, B.supply, R.Rfirst)
+    sg.add_edge(B.max_output, B.supply, R.Rfirst)
 
-    shg.add_edge({'state': B.state, 'level': B.charge_level, 
+    sg.add_edge({'state': B.state, 'level': B.charge_level, 
                  'max_level': B.charge_capacity, 'eff': B.efficiency}, 
                 target=B.charge_level, 
                 rel=Rcalc_battery_charge_level, 
@@ -652,13 +663,13 @@ for B in BATTERYs:
                 disposable=['level', 'state'],
                 index_via=lambda state, level, **kw: R.Rsame(state-1, level)
                 )
-    shg.add_edge({'level': B.charge_level, 
+    sg.add_edge({'level': B.charge_level, 
                  'capacity': B.charge_capacity}, 
                 target=B.soc,
                 rel=lambda level, capacity, **kw : level / capacity, 
                 edge_props=['LEVEL, DISPOSE_ALL']
                 )
-    shg.add_edge({'ug_cost': UGs[0].cost, 
+    sg.add_edge({'ug_cost': UGs[0].cost, 
                  'tol': tol, 
                  'level': B.charge_level, 
                  'capacity': B.charge_capacity, 
@@ -667,7 +678,7 @@ for B in BATTERYs:
                 disposable=['level'],
                 rel=Rcalc_battery_cost
                 )
-    shg.add_edge({'ug_cost': UGs[0].cost, 
+    sg.add_edge({'ug_cost': UGs[0].cost, 
                  'level': B.charge_level, 
                  'capacity': B.charge_capacity, 
                  'factor': B.scarcity_factor},
@@ -675,7 +686,7 @@ for B in BATTERYs:
                 disposable=['level'],
                 rel=Rcalc_battery_benefit,
                 )    
-    shg.add_edge({'level': B.charge_level,
+    sg.add_edge({'level': B.charge_level,
                  'capacity': B.charge_capacity,
                  'max_rate': B.max_charge_rate,
                  'trickle_prop': batt_trickle}, 
@@ -690,13 +701,13 @@ for B in BATTERYs:
 ###################################################
 
 ## Edges
-shg.add_edge(valid_data_path, valid_data, Rget_data_from_csv_file)
+sg.add_edge(valid_data_path, valid_data, Rget_data_from_csv_file)
 
-shg.add_edge(elapsed_hours, elapsed_minutes, Rcalc_elapsed_minutes)
+sg.add_edge(elapsed_hours, elapsed_minutes, Rcalc_elapsed_minutes)
 
-shg.add_edge({'csv_data': valid_data,
+sg.add_edge({'csv_data': valid_data,
              'row': elapsed_minutes,
-             'col': sunlight_power_label}, 
+             'col': pv_power_label}, 
             target=PVs[0].state,
             rel=Rget_float_from_csv_data,
             disposable=['row'])

@@ -15,16 +15,16 @@ inputs = {
 
 # Debugging options, also set logging_level to 12 or lower
 debug_nodes = {'state_matrix'} if False else None
-debug_edges = {'calc_solar_supply'} if False else None
+debug_edges = {'get_failing_actors'} if True else None
 
 # Solve for a single node
-t = shg.solve(
-            target=GENs[0].state,
+t = sg.solve(
+            target=state_matrix,
             inputs=inputs,
-            min_index=0, 
-            search_depth=1000, to_print=False,
+            min_index=2, 
+            search_depth=300, to_print=False,
             debug_nodes=debug_nodes, debug_edges=debug_edges, 
-            logging_level=logging.INFO)
+            logging_level=logging.DEBUG)
 
 if t is not None:
     print(t.value)

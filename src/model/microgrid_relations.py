@@ -169,7 +169,10 @@ def Rdeterming_if_failing(is_failing: bool, p_fail: float, p_fix: float,
 def Rget_failing_actors(names: list, *args, **kwargs)-> list:
     """Returns a list of actors that are failing, where kwargs are of the 
     form ``{label : is_failing}."""
-    failing = [kwargs.get(name, False) for name in names]
+    failing = []
+    for name in names:
+        if kwargs.get(name, False):
+            failing.append(name)
     return failing
 
 def Rdetermine_if_loadshedding(state: float, req_demand: float, tol: float)-> bool:
