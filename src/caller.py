@@ -18,7 +18,7 @@ debug_edges = {'calc_solar_supply'} if True else None
 
 # Solve for a single node
 t = mg.solve(
-            target=failing_actors,
+            target=state_matrix,
             # target=GENs[0].max_consumption,
             inputs=inputs, min_index=3, 
             search_depth=3000, to_print=False,

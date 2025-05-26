@@ -15,16 +15,16 @@ inputs = {
 
 # Debugging options, also set logging_level to 12 or lower
 debug_nodes = {'state_matrix'} if False else None
-debug_edges = {'get_failing_actors'} if True else None
+debug_edges = {'make_demand_vector'} if True else None
 
 # Solve for a single node
 t = sg.solve(
             target=state_matrix,
             inputs=inputs,
-            min_index=2, 
-            search_depth=300, to_print=False,
+            min_index=0, 
+            search_depth=500, to_print=False,
             debug_nodes=debug_nodes, debug_edges=debug_edges, 
-            logging_level=logging.DEBUG)
+            logging_level=logging.INFO)
 
 if t is not None:
     print(t.value)
@@ -32,7 +32,7 @@ else:
     print("No solutions found")
 
 # Solve for and plot actor states
-# solve_and_plot_states(mg, inputs, 72)
+solve_and_plot_states(sg, inputs, 24)
 
 # Solve for multiple nodes and indices (exhaustive)
 # solve_and_plot(mg, [PVs[0].demand, elapsed_hours, sunlight, 

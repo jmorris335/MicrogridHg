@@ -53,8 +53,10 @@ BATTERYs = [
     ),
 ]
 
-BUILDINGs = [
-    Building('Building1Small', BUILDING_TYPE.SMALL, benefit=10),
+LOADs = [
+    GridActor(name='TestLoad',
+              benefit=10,
+    ),
 ]
 
 BUSs = [
@@ -73,9 +75,9 @@ UGs = [
     )
 ]
 
-WINDs = []
+WINDs, BUILDINGs = [], []
 
-ACTORS = GENs + BATTERYs + UGs + BUSs + PVs + BUILDINGs + WINDs
+ACTORS = GENs + BATTERYs + UGs + BUSs + PVs + BUILDINGs + WINDs + LOADs
 
 ### Connectivity
 for ACTOR in ACTORS: #Set default as not connected
@@ -543,11 +545,23 @@ for W in WINDs:
                 disposable=['velocity', 'density'],
                 index_via=lambda density, velocity, **kw : R.Rsame(density, velocity)
                 )
+    
+### Loads
+for L in LOADs + BUILDINGs:
+    sg.add_edge(L.req_demand, L.max_demand, R.Rfirst)
+
+    sg.add_edge({'conn': L.is_connected, 
+                 'normal': L.normal_load, 
+                 'critical': L.critical_load,
+                 'island': is_islanded}, 
+                target=L.req_demand, 
+                rel=Rdetermine_building_load, 
+                edge_props=['LEVEL', 'DISPOSE_ALL'], 
+                label='calc building demand'
+                )
 
 ### Buildings
 for B in BUILDINGs:
-    sg.add_edge(B.req_demand, B.max_demand, R.Rfirst)
-        
     sg.add_edge({'directory': load_directory,
                  'building_type': B.type},
                 B.building_filename,
@@ -578,16 +592,6 @@ for B in BUILDINGs:
                 target=B.critical_load,
                 rel=Rcalc_critical_load,
                 edge_props=['LEVEL', 'DISPOSE_ALL']
-                )
-    #TODO: Need to implement a way for the critical load to be passed as well.
-    sg.add_edge({'conn': B.is_connected, 
-                 'normal': B.normal_load, 
-                 'critical': B.critical_load,
-                 'island': is_islanded}, 
-                target=B.req_demand, 
-                rel=Rdetermine_building_load, 
-                edge_props=['LEVEL', 'DISPOSE_ALL'], 
-                label='calc building demand'
                 )
 
 
@@ -705,9 +709,10 @@ sg.add_edge(valid_data_path, valid_data, Rget_data_from_csv_file)
 
 sg.add_edge(elapsed_hours, elapsed_minutes, Rcalc_elapsed_minutes)
 
-sg.add_edge({'csv_data': valid_data,
-             'row': elapsed_minutes,
-             'col': pv_power_label}, 
-            target=PVs[0].state,
-            rel=Rget_float_from_csv_data,
-            disposable=['row'])
+for PV in PVs:
+    sg.add_edge({'csv_data': valid_data,
+                'row': elapsed_minutes,
+                'col': pv_power_label}, 
+                target=PV.supply,
+                rel=Rget_float_from_csv_data,
+                disposable=['row'])

@@ -301,20 +301,15 @@ class BUILDING_TYPE(Enum):
     LARGE = 'LargeOffice'
     WAREHOUSE = 'Warehouse'
 
-class Building(GridActor):
-    """A grid object with a determined load."""
-    def __init__(self, name: str, type: BUILDING_TYPE=None, **kwargs):
+class Load(GridActor):
+    """An actor only capable of receiving power from the grid."""
+    def __init__(self, name: str, **kwargs):
         defaults = dict(
             cost = float('inf'),
             supply = 0.,
             )
         kwargs = defaults | kwargs
 
-        self.type = Node(
-            f'type_{name}',
-            type, 
-            description='type of building'
-            )
         self.normal_load = Node(
             f'normal_load_{name}',
             kwargs.get('normal_load', None), 
@@ -324,6 +319,17 @@ class Building(GridActor):
             f'critical_load_{name}',
             kwargs.get('critical_load', None), 
             description='critical_load of building'
+            )
+        
+        super().__init__(name, output=0., **kwargs)
+
+class Building(Load):
+    """A grid object with a determined load."""
+    def __init__(self, name: str, type: BUILDING_TYPE=None, **kwargs):
+        self.type = Node(
+            f'type_{name}',
+            type, 
+            description='type of building'
             )
         self.lights_load = Node(
             f'lights_load_{name}',
@@ -360,7 +366,7 @@ class Building(GridActor):
             kwargs.get('equipment_col_name', 'InteriorEquipment:Electricity [kW](Hourly)'),
             description='name of column with equipment loads in building data'
             )
-        super().__init__(name, output=0., **kwargs)
+        super().__init__(name, **kwargs)
 
 ## Modes
 class MICROGRID_MODE(Enum):
