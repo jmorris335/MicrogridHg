@@ -31,4 +31,4 @@ else:
     print("No solutions found")
 
 # Solve for and plot actor states
-solve_and_plot_states(sg, inputs, 30)
+solve_and_plot_states(sg, inputs, 42)

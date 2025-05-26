@@ -10,6 +10,7 @@ inputs = {
     start_hour: 9,
     has_random_failure: False,
     island_mode: True,
+    time_step: 3600,
 }
 
 # Debugging options, also set logging_level to 12 or lower
@@ -30,7 +31,7 @@ else:
     print("No solutions found")
 
 # Solve for and plot actor states
-# solve_and_plot_states(mg, inputs, 72)
+solve_and_plot_states(mg, inputs, 72)
 
 # Solve for multiple nodes and indices (exhaustive)
 # solve_and_plot(mg, [PVs[0].demand, elapsed_hours, sunlight, 

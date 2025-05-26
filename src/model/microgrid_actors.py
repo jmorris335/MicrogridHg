@@ -204,12 +204,14 @@ class Battery(GridActor):
         self.charge_level = Node(
             f'charge_level_{name}',
             charge_level, 
-            description='amount of charge in battery'
+            description='amount of charge in battery',
+            units='kWh'
             )
         self.charge_capacity = Node(
             f'charge_capacity_{name}',
             charge_capacity, 
-            description='max amount of charge in battery'
+            description='max amount of charge in battery',
+            units='kWh'
             )
         self.wasted_charge = Node(
             f'wasted_charge_{name}',

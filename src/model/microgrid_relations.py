@@ -311,9 +311,9 @@ def Rdetermine_battery_is_charging(island: bool, load: float, level: float,
     return level < capacity
 
 def Rcalc_battery_charge_level(state: float, level: float, max_level: float, 
-                               eff: float, **kwargs)-> float:
+                               time_step: float, **kwargs)-> float:
     """Calculates the charge level of the battery based on power flow (W)."""
-    expected_level = level + (eff * state)
+    expected_level = level + state * time_step
     new_level = max(0, min(expected_level, max_level))
     return new_level
 

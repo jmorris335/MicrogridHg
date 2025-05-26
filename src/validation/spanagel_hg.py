@@ -35,20 +35,20 @@ GENs = [
 BATTERYs = [
     Battery(
         name='BatteryString1', 
-        charge_capacity=10000.,
-        charge_level=10000., 
+        charge_capacity=9.,
+        charge_level=1, 
         max_output=350.,
         efficiency=0.45,
-        max_charge_rate=2.,
+        max_charge_rate=float('inf'),
         scarcity_factor=1.5,
     ),
     Battery(
         name='BatteryString2', 
-        charge_capacity=10000.,
-        charge_level=10000., 
+        charge_capacity=9.,
+        charge_level=0., 
         max_output=350.,
         efficiency=0.45,
-        max_charge_rate=2.,
+        max_charge_rate=float('inf'),
         scarcity_factor=1.5,
     ),
 ]
@@ -185,6 +185,8 @@ names = Node('names',
     description='ordered list of names of actors considered in the model')
 
 ### Simulation
+time_step = Node('time_step', units='s',
+    description='seconds since last time calculation')
 elapsed_hours = Node('elapsed hours', 0, 
     description='number of hours that have passed during the simulation.')
 elapsed_minutes = Node('elapsed_minutes', 0,
@@ -662,8 +664,10 @@ for B in BATTERYs:
 
     sg.add_edge(B.max_output, B.supply, R.Rfirst)
 
-    sg.add_edge({'state': B.state, 'level': B.charge_level, 
-                 'max_level': B.charge_capacity, 'eff': B.efficiency}, 
+    sg.add_edge({'state': B.state, 
+                 'level': B.charge_level, 
+                 'max_level': B.charge_capacity,
+                 'time_step': time_step}, 
                 target=B.charge_level, 
                 rel=Rcalc_battery_charge_level, 
                 label='calc battery charge level',
