@@ -34,22 +34,12 @@ GENs = [
 
 BATTERYs = [
     Battery(
-        name='BatteryString1', 
-        charge_capacity=9.,
-        charge_level=0, 
+        name='BESS', 
+        charge_capacity=18.,
+        charge_level=14, 
         max_output=350.,
         efficiency=0.45,
-        max_charge_rate=float('inf'),
-        scarcity_factor=1.5,
-        trickle_prop=0.9,
-    ),
-    Battery(
-        name='BatteryString2', 
-        charge_capacity=9.,
-        charge_level=0., 
-        max_output=350.,
-        efficiency=0.45,
-        max_charge_rate=float('inf'),
+        max_charge_rate=100.,
         scarcity_factor=1.5,
         trickle_prop=0.9,
     ),
@@ -703,7 +693,8 @@ for B in BATTERYs:
                  'capacity': B.charge_capacity,
                  'max_rate': B.max_charge_rate,
                  'trickle_prop': B.trickle_prop,
-                 'trickle_rate': batt_trickle}, 
+                 'trickle_rate': batt_trickle,
+                 'time_step': time_step}, 
                 target=B.max_demand, 
                 disposable=['level'],
                 rel=Rcalc_battery_max_demand,
@@ -725,14 +716,14 @@ def Rcalc_battery_cost_spanagel(is_charging: bool, trickle_prop: float,
     elif level < capacity * 0.5:
         return 100
     elif is_charging:
-        return 50
+        return 0.2
     return 0.1
 
 def Rcalc_battery_benefit_spanagel(level: float, capacity:float, **kwargs):
     """Calculate the benefit of charging the battery."""
     if level >= capacity:
         return 0.0
-    return 0.001
+    return 0.25
 
 ## Edges
 sg.add_edge(valid_data_path, valid_data, Rget_data_from_csv_file)

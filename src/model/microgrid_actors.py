@@ -155,32 +155,38 @@ class Generator(GridActor):
         self.fuel_capacity = Node(
             f'fuel_capacity_{name}',
             fuel_capacity, 
-            description='max amount of fuel in generator', units='liters'
+            description='max amount of fuel in generator',
+            units='liters',
             )
         self.starting_fuel_level = Node(
             f'starting_fuel_level_{name}',
             starting_fuel_level, 
-            description='starting fuel level in generator', units='liters'
+            description='starting fuel level in generator',
+            units='liters',
             )
         self.max_output = Node(
             f'max_output_{name}',
             max_output, 
-            description='max charge generator can output', units='kW'
+            description='max charge generator can output',
+            units='kW',
             )
         self.consumption = Node(
             f'consumption_{name}',
             kwargs.get('consumpation', None),
-            description='fuel consumption for generator', units='(L/h)'
+            description='fuel consumption for generator',
+            units='L/h',
             )
         self.max_consumption = Node(
             f'max_consumption_{name}',
             kwargs.get('max_consumpation', None), 
-            description='max fuel consumption for generator', units='(L/h)'
+            description='max fuel consumption for generator',
+            units='L/h',
             )
         self.fuel_level = Node(
             f'fuel_level_{name}',
             kwargs.get('fuel_level', None), 
-            description='amount of fuel in generator', units='liters'
+            description='amount of fuel in generator',
+            units='liters',
             )
         self.out_of_fuel = Node(
             f'out_of_fuel_{name}',
@@ -222,7 +228,8 @@ class Battery(GridActor):
         self.max_output = Node(
             f'max_output_{name}',
             max_output, 
-            description='max power battery can output', units='kW'
+            description='max power battery can output',
+            units='kW',
             )
         self.efficiency = Node(
             f'efficiency_{name}',
@@ -231,8 +238,9 @@ class Battery(GridActor):
             )
         self.max_charge_rate = Node(
             f'max_charge_rate_{name}',
-            max_charge_rate, 
-            description='max charge rate for battery', units='kW/hr'
+            max_charge_rate,
+            description='max charge rate for battery', 
+            units='kW/hr',
             )
         self.scarcity_factor = Node(
             f'scarcity_factor_{name}',
@@ -269,7 +277,8 @@ class PhotovoltaicArray(GridActor):
         self.area = Node(
             f'area_{name}',
             area,
-            description='area of photovoltaic array (m^2)'
+            description='area of photovoltaic array',
+            units='m^2',
             )
         self.efficiency = Node(
             f'efficiency_{name}',

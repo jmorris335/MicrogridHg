@@ -320,13 +320,14 @@ def Rcalc_battery_benefit(ug_cost: float, level: float, capacity:float, factor: 
 
 def Rcalc_battery_max_demand(level: float, capacity: float, max_rate: float, 
                              trickle_prop: float, trickle_rate: float, 
-                             **kwargs)-> float:
+                             time_step: float, **kwargs)-> float:
     """Calculates the maximum power the battery can receive."""
     if level > trickle_prop * capacity:
-        demand = trickle_rate * max_rate
+        demand = trickle_rate * max_rate * time_step
     else:
-        demand = max_rate
-    demand = -abs(demand)
+        demand = max_rate * time_step
+    demand = abs(demand)
+    demand = max(demand, capacity - level)
     return demand
 
 
@@ -347,8 +348,8 @@ def Rmake_demand_vector(conn: list, names: list, tol: float,
         Minimum value used for floating point comparisons with zero.
     **kwargs : dict
         Must contain n source tuples and n demand tuples keyed with a 
-        keyword containing either ``source_tuples`` or ``demand_tuples`` 
-        respectively. Source tuples are of the format ``(label, cost, 
+        keyword containing either ``supply_tuples`` or ``demand_tuples`` 
+        respectively. Supply tuples are of the format ``(label, cost, 
         supply)``, while demand tuples should follow ``(label, benefit, 
         req_demand, max_demand)``, with the label corresponding to the 
         name in ``names``.
