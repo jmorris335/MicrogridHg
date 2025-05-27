@@ -189,7 +189,7 @@ names = Node('names',
 ### Simulation
 time_step = Node('time_step', units='hr',
     description='hours since last time calculation')
-elapsed_hours = Node('elapsed hours', 0, 
+elapsed_hours = Node('elapsed_hours', 0, 
     description='number of hours that have passed during the simulation.')
 elapsed_minutes = Node('elapsed_minutes', 0,
     description='number of minutes that have passed during the simulation.')
