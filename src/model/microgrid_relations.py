@@ -279,10 +279,9 @@ def Rcalc_generator_fuel_consumption(load: float, max_load: float,
     index = diff.index(min(diff))
     return consumption_rates[index]
 
-def Rcalc_generator_cost(fuel_cost: float, output: float, consumption: float, 
-                         *args, **kwargs)-> float:
+def Rcalc_generator_cost(fuel_cost: float, consumption: float, **kwargs)-> float:
     """Determines the cost of running the generator."""
-    cost = fuel_cost * consumption / output
+    cost = fuel_cost * consumption
     return cost
 
 ## Batteries
@@ -332,6 +331,7 @@ def Rcalc_battery_max_demand(level: float, capacity: float, max_rate: float,
 
 
 ## Power distribution strategy
+#TODO: Eventually this should be unabstracted into the hypergraph, but for now its considered a black-box mapping.
 def Rmake_demand_vector(conn: list, names: list, tol: float, 
                        *args, **kwargs)->list:
     """Determines the demand for each object on the grid.
@@ -350,9 +350,9 @@ def Rmake_demand_vector(conn: list, names: list, tol: float,
         Must contain n source tuples and n demand tuples keyed with a 
         keyword containing either ``supply_tuples`` or ``demand_tuples`` 
         respectively. Supply tuples are of the format ``(label, cost, 
-        supply)``, while demand tuples should follow ``(label, benefit, 
-        req_demand, max_demand)``, with the label corresponding to the 
-        name in ``names``.
+        supply, is_cost_per_unit)``, while demand tuples should follow 
+        ``(label, benefit, req_demand, max_demand)``, with the label 
+        corresponding to the name in ``names``.
 
     Process
     -------
@@ -400,8 +400,8 @@ def Rmake_demand_vector(conn: list, names: list, tol: float,
 
         sts_filtered = [st for st in supply_tuples if st[0] in ind_suppliers]
         dts_filtered = [dt for dt in demand_tuples if dt[0] in ind_demanders]
-        supply_queue = make_supply_queue(tol, *sts_filtered)
-        demand_queue = make_demand_queue(tol, *dts_filtered)
+        supply_queue = make_supply_queue(*sts_filtered)
+        demand_queue = make_demand_queue(*dts_filtered)
 
         found_states = meet_circuit_demand(demand_queue, supply_queue, tol)
         if any([fs in states for fs in found_states]):
@@ -462,7 +462,7 @@ def can_send_to(src, sink, conn: list, visited: set=None):
         return any([can_send_to(new_src, sink, conn, visited) 
                     for new_src in direct_sinks])
 
-def make_demand_queue(tol: float, *args, **kwargs):
+def make_demand_queue(*args, **kwargs):
     """Compiles the demand queue from the demand tuples, sorted by 
     benefit. Queue is compiled from tuples passed to *args or **kwargs 
     of the following form: ``(label, benefit, req_demand, max_demand)``
@@ -475,22 +475,22 @@ def make_demand_queue(tol: float, *args, **kwargs):
     demand_queue = [val for val in args if all([
                         isinstance(val, tuple),
                         len(val) == 4,
-                        val[1] > -tol,
-                        val[2] > -tol])]
+                        val[1] > 0 or val[2] > 0])
+                    ]
     demand_queue.sort(key=lambda a : a[1], reverse=True)
     return demand_queue
 
-def make_supply_queue(tol: float, *args, **kwargs):
+def make_supply_queue(*args, **kwargs):
     """Compiles the supply queue from the supply tuples, sorted by cost. 
     Queue is compiled from tuples passed to *args or **kwargs of the 
-    following form: ``(label, cost, supply)``
+    following form: ``(label, cost, supply, is_cost_per_unit)``
     """
     args = R.extend(args, kwargs)
-    supply_queue = [val for val in args if all([
-                        isinstance(val, tuple),
-                        len(val) == 3,
-                        val[1] != float('inf'),
-                        val[2] > -tol])]
+    supply_queue = [st for st in args if all([
+                        isinstance(st, tuple),
+                        len(st) == 4,
+                        st[1] != float('inf'),
+                        st[2] > 0])]
     supply_queue.sort(key=lambda a : a[1])
 
     return supply_queue
@@ -503,7 +503,8 @@ def meet_circuit_demand(demand_queue: list, supply_queue: list, tol: float):
         return {}
     
     states, s_idx, unused_s = meet_req_demands(demand_queue, supply_queue, states, tol)
-    states = meet_max_demands(demand_queue, supply_queue, states, tol, unused_s, s_idx=s_idx)
+    if s_idx < len(supply_queue):
+        states = meet_max_demands(demand_queue, supply_queue, states, tol, unused_s, s_idx=s_idx)
 
     return states
 
@@ -532,7 +533,7 @@ def meet_req_demands(demand_q: list, supply_q: list, states: dict, tol: float,
     previous state. This proceeds until either all demands are met or 
     the supply is exhuasted.
     """
-    s_label, cost, supply = supply_q[s_idx]
+    s_label, cost, supply, _ = supply_q[s_idx]
     d_label, benefit, req_d, _ = demand_q[d_idx]
 
     unused_s = supply if current_supply is None else current_supply
@@ -543,7 +544,7 @@ def meet_req_demands(demand_q: list, supply_q: list, states: dict, tol: float,
         while benefit >= cost:
             while (unused_s < tol or 
                    actor_is_receiving(s_label, states)):
-                s_label, cost, supply = supply_q[s_idx := s_idx + 1]
+                s_label, cost, supply, _ = supply_q[s_idx := s_idx + 1]
                 unused_s = supply
 
             while any((unmet_d < tol, d_label in states, 
@@ -578,32 +579,46 @@ def meet_max_demands(demand_q: list, supply_q: list, states: dict,
     out : dict
         The updated states in ``{name : state}`` format.
     """
-    s_label, cost, supply = supply_q[s_idx]
+    s_label, cost, supply, is_cost_per_unit = supply_q[s_idx]
     d_label, benefit, req_d, max_d = demand_q[d_idx]
 
     unused_s = supply if current_supply is None else current_supply
     unmet_d = max_d - req_d
 
-    try:
-        while True:
-            while unused_s < tol or actor_is_receiving(s_label, states):
-                s_label, cost, supply = supply_q[s_idx := s_idx + 1]
-                unused_s = supply
+    while True:
+        while any((unused_s < tol,
+                   not use_lump_supply(cost, benefit, supply, is_cost_per_unit, unused_s),
+                   actor_is_receiving(s_label, states))):
+            if (s_idx := s_idx + 1) >= len(supply_q):
+                return states
+            s_label, cost, supply, is_cost_per_unit = supply_q[s_idx]
+            unused_s = supply
 
-            while any((unmet_d < tol, 
-                       actor_is_supplying(d_label, states), 
-                       d_label == s_label)):
-                d_label, benefit, req_d, max_d = demand_q[d_idx := d_idx + 1]
-                unmet_d = max_d - req_d
+        while any((unmet_d < tol, 
+                   actor_is_supplying(d_label, states), 
+                   d_label == s_label)):
+            if (d_idx := d_idx + 1) >= len(demand_q):
+                return states
+            d_label, benefit, req_d, max_d = demand_q[d_idx]
+            unmet_d = max_d - req_d
 
-            if benefit < cost:
-                break
-            unmet_d, unused_s = meet_actor_demand(unmet_d, unused_s)
-            states[s_label] = abs(supply - unused_s)
-            states[d_label] = -abs(max_d - unmet_d)
-    except: IndexError
+        if is_cost_per_unit and benefit < cost:
+            break
+        unmet_d, unused_s = meet_actor_demand(unmet_d, unused_s)
+        states[s_label] = abs(supply - unused_s)
+        states[d_label] = -abs(max_d - unmet_d)
 
     return states
+
+def use_lump_supply(cost, benefit, supply, is_cost_per_unit, unused_s):
+    """Returns True if the supplier costing is both a lump sum (versus 
+    cost per unit) and also below the cost threshold.
+    """
+    if is_cost_per_unit:
+        return False
+    if unused_s == supply:
+        return benefit > cost
+    return True
 
 def actor_is_supplying(label: str, grid_states: dict)-> bool:
     """Returns True if the given actor is listed as supplying power."""

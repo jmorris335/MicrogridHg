@@ -95,6 +95,9 @@ def solve_and_plot_states(mg: chg.Hypergraph, inputs: dict, min_index: int=8,
     states['elapsed_hours'] = fv['elapsed hours']
     for sv in fv[state_vector]:
         for state_value, name in zip(sv, names):
+            if 'bus' in name.lower():
+                continue
             states[name].append(state_value)
-    plot_time_values(names, states, 'elapsed_hours', 
+    outnames = [n for n in names if 'bus' not in n.lower()]
+    plot_time_values(outnames, states, 'elapsed_hours', 
                      title='States of Grid Actors', ylabel='Power (kW)')

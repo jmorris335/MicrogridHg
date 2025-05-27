@@ -118,9 +118,10 @@ def make_supply_tuple_edge(ACTOR: GridActor, dynamic: list):
     """Convenience function for making the supply tuple edge."""
     sg.add_edge({'label': ACTOR.name,
                  'cost': ACTOR.cost,
-                 'supply': ACTOR.supply},
+                 'supply': ACTOR.supply,
+                 'is_cost_per_unit': ACTOR.is_cost_per_unit},
                 target=ACTOR.supply_tuple,
-                rel=lambda **kw : R.to_tuple(['label', 'cost', 'supply'], **kw),
+                rel=lambda **kw : R.to_tuple(['label', 'cost', 'supply', 'is_cost_per_unit'], **kw),
                 disposable=dynamic,
                 index_via=lambda **kw : R.Rsame(*[kw[key] for key in dynamic]),
                 label='make_supply_tuple')
@@ -723,7 +724,7 @@ def Rcalc_battery_benefit_spanagel(level: float, capacity:float, **kwargs):
     """Calculate the benefit of charging the battery."""
     if level >= capacity:
         return 0.0
-    return 0.25
+    return 0.05
 
 ## Edges
 sg.add_edge(valid_data_path, valid_data, Rget_data_from_csv_file)

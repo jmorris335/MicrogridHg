@@ -20,7 +20,7 @@ debug_edges = {'make_demand_vector'} if False else None
 # Solve for a single node
 t = sg.solve(target=state_matrix,
              inputs=inputs,
-             min_index=0, 
+             min_index=2, 
              search_depth=2000, to_print=False,
              debug_nodes=debug_nodes, debug_edges=debug_edges, 
              logging_level=logging.INFO)

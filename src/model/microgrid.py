@@ -20,6 +20,7 @@ UGs = [
         req_demand=0.,
         max_demand=120.,
         supply=20000.,
+        is_cost_per_unit=True,
     )
 ]
 
@@ -66,8 +67,8 @@ BATTERYs = [
     Battery(
         name='Battery1', 
         charge_capacity=10000.,
-        charge_level=10000., 
-        max_output=350.,
+        charge_level=1050., 
+        max_output=500.,
         efficiency=0.45,
         max_charge_rate=2.,
         scarcity_factor=1.5,
@@ -126,9 +127,10 @@ def make_supply_tuple_edge(ACTOR: GridActor, dynamic: list):
     """Convenience function for making the supply tuple edge."""
     mg.add_edge({'label': ACTOR.name,
                  'cost': ACTOR.cost,
-                 'supply': ACTOR.supply},
+                 'supply': ACTOR.supply,
+                 'is_cost_per_unit': ACTOR.is_cost_per_unit},
                 target=ACTOR.supply_tuple,
-                rel=lambda **kw : R.to_tuple(['label', 'cost', 'supply'], **kw),
+                rel=lambda **kw : R.to_tuple(['label', 'cost', 'supply', 'is_cost_per_unit'], **kw),
                 disposable=dynamic,
                 index_via=lambda **kw : R.Rsame(*[kw[key] for key in dynamic]),
                 label='make_supply_tuple')
@@ -651,7 +653,6 @@ for G in GENs:
                 rel=Rcalc_generator_fuel_consumption,
                 )
     mg.add_edge({'fuel_cost': cost_of_diesel,
-                 'output': G.max_output,
                  'consumption': G.max_consumption},
                 target=G.cost,
                 rel=Rcalc_generator_cost,

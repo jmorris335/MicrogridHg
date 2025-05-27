@@ -39,37 +39,42 @@ class GridActor:
             f'state_{name}', 
             kwargs.get('state', None), 
             description='amount of power actively receiving (-) or providing (+)',
-            units='kW'
+            units='kW',
             )
         self.benefit = Node(
             f'benefit_{name}',
             kwargs.get('benefit', None),
             description=f'Benefit of meeting {name}\'s demand',
-            units='$/kW'
+            units='$/kW',
             )
         self.cost = Node(
             f'cost_{name}',
             kwargs.get('cost', None),
             description=f'Cost of generating {name}\'s supply',
-            units='$/kW'
+            units='$/kW',
             )
         self.req_demand = Node(
             f'req_demand_{name}',
             kwargs.get('req_demand', None),
             description=f'Minimum load required for the actor to operate',
-            units='kW'
+            units='kW',
             )
         self.max_demand = Node(
             f'max_demand_{name}',
             kwargs.get('max_demand', None),
             description=f'Maximum load that the actor can receive',
-            units='kW'
+            units='kW',
             )
         self.supply = Node(
             f'supply_{name}',
             kwargs.get('supply', None),
             description=f'Current energy that the actor can supply',
-            units='kW'
+            units='kW',
+            )
+        self.is_cost_per_unit = Node(
+            f'is_cost_per_unit_{name}',
+            kwargs.get('is_cost_per_unit', True),
+            description=f'True if supply costing is per unit versus lump',
             )
         
         self.receives_from = {name: Node(
@@ -149,6 +154,7 @@ class Generator(GridActor):
             benefit = 0.,
             req_demand = 0.,
             max_demand = 0.,
+            is_cost_per_unit = False,
             )
         kwargs = defaults | kwargs
 
@@ -205,6 +211,7 @@ class Battery(GridActor):
                  **kwargs):
         defaults = dict(
             req_demand = 0.,
+            is_cost_per_unit = True,
             )
         kwargs = defaults | kwargs
 
@@ -271,6 +278,7 @@ class PhotovoltaicArray(GridActor):
             benefit = 0.,
             req_demand = 0.,
             max_demand = 0.,
+            is_cost_per_unit = False,
             )
         kwargs = defaults | kwargs
 
@@ -294,6 +302,7 @@ class WindTurbine(GridActor):
             benefit = 0.,
             req_demand = 0.,
             max_demand = 0.,
+            is_cost_per_unit = False,
             )
         kwargs = defaults | kwargs
 

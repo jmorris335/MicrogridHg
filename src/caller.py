@@ -7,7 +7,7 @@ inputs = {
     use_random_date: False,
     start_day: 100,
     start_year: 2004,
-    start_hour: 9,
+    start_hour: 12,
     has_random_failure: False,
     island_mode: True,
     time_step: 3600,
@@ -29,7 +29,7 @@ else:
     print("No solutions found")
 
 # Solve for and plot actor states
-# solve_and_plot_states(mg, inputs, 72)
+solve_and_plot_states(mg, inputs, 72)
 
 # Solve for multiple nodes and indices (exhaustive)
 # solve_and_plot(mg, [PVs[0].demand, elapsed_hours, sunlight, 
