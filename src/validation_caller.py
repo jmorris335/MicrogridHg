@@ -10,18 +10,18 @@ inputs = {
     start_year: 2025,
     start_hour: 15,
     has_random_failure: False,
-    time_step: 3600,
+    time_step: 1,
 }
 
 # Debugging options, also set logging_level to 12 or lower
 debug_nodes = {'state_matrix'} if False else None
-debug_edges = {'make_demand_vector'} if False else None
+debug_edges = {'calc_battery_charge_level'} if True else None
 
 # Solve for a single node
-t = sg.solve(target=state_matrix,
+t = sg.solve(target=BATTERYs[0].state,
              inputs=inputs,
-             min_index=2, 
-             search_depth=2000, to_print=False,
+             min_index=3, 
+             search_depth=3000, to_print=False,
              debug_nodes=debug_nodes, debug_edges=debug_edges, 
              logging_level=logging.INFO)
 
@@ -30,5 +30,8 @@ if t is not None:
 else:
     print("No solutions found")
 
+# solve_and_plot(sg, [BATTERYs[0].supply], inputs, [43])
+
 # Solve for and plot actor states
-solve_and_plot_states(sg, inputs, 42)
+solve_and_plot_states(sg, inputs, 43)
+#TODO: Need to investigate if `consider_lump_supply` is ruining PV output

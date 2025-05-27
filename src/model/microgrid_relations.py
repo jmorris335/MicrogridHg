@@ -293,9 +293,14 @@ def Rdetermine_battery_is_charging(island: bool, load: float, level: float,
     return level < capacity
 
 def Rcalc_battery_charge_level(state: float, level: float, max_level: float, 
-                               time_step: float, **kwargs)-> float:
-    """Calculates the charge level of the battery based on power flow (W)."""
-    expected_level = level + state * time_step
+                               time_step: float, efficiency: float, **kwargs)-> float:
+    """Calculates the charge level of the battery based on power flow (W).
+    
+    Note that negative state indicates receiving power.
+    """
+    if state < 0:
+        state *= efficiency
+    expected_level = level - state * time_step
     new_level = max(0, min(expected_level, max_level))
     return new_level
 
@@ -587,7 +592,8 @@ def meet_max_demands(demand_q: list, supply_q: list, states: dict,
 
     while True:
         while any((unused_s < tol,
-                   not use_lump_supply(cost, benefit, supply, is_cost_per_unit, unused_s),
+                   not consider_lump_supply(tol, cost, benefit, supply, 
+                                            is_cost_per_unit, unused_s),
                    actor_is_receiving(s_label, states))):
             if (s_idx := s_idx + 1) >= len(supply_q):
                 return states
@@ -610,13 +616,14 @@ def meet_max_demands(demand_q: list, supply_q: list, states: dict,
 
     return states
 
-def use_lump_supply(cost, benefit, supply, is_cost_per_unit, unused_s):
-    """Returns True if the supplier costing is both a lump sum (versus 
-    cost per unit) and also below the cost threshold.
+def consider_lump_supply(tol, cost, benefit, supply, is_cost_per_unit, unused_s):
+    """If the supplier's costing is calculated as a lump sum, returns True
+    only if the supplier's cost is beneficial or the supplier was 
+    previously engaged.
     """
     if is_cost_per_unit:
-        return False
-    if unused_s == supply:
+        return True
+    if (unused_s - supply) < tol:
         return benefit > cost
     return True
 

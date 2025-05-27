@@ -10,7 +10,7 @@ inputs = {
     start_hour: 12,
     has_random_failure: False,
     island_mode: True,
-    time_step: 3600,
+    time_step: 1,
 }
 
 # Debugging options, also set logging_level to 12 or lower

@@ -19,7 +19,7 @@ sg = Hypergraph(no_weights=True)
 PVs = [
     PhotovoltaicArray(
         name='PV1', 
-        cost=0.02,
+        cost=0.001,
     )
 ]
 
@@ -28,7 +28,7 @@ GENs = [
         name='Generator1', 
         fuel_capacity=28., 
         starting_fuel_level=28., 
-        max_output=7., 
+        max_output=6.2, 
     ),
 ]
 
@@ -36,11 +36,10 @@ BATTERYs = [
     Battery(
         name='BESS', 
         charge_capacity=18.,
-        charge_level=14, 
+        charge_level=15, 
         max_output=350.,
-        efficiency=0.45,
-        max_charge_rate=100.,
-        scarcity_factor=1.5,
+        charge_efficiency=0.85,
+        max_charge_rate=10.,
         trickle_prop=0.9,
     ),
 ]
@@ -55,21 +54,7 @@ BUSs = [
     Bus('Bus1')
 ]
 
-UGs = [
-    # GridActor(
-    #     name='UtilityGrid', 
-    #     is_load_shedding=False,
-    #     benefit=0.0,
-    #     cost=0.13,
-    #     req_demand=0.,
-    #     max_demand=0.,
-    #     supply=0.,
-    # )
-]
-
-WINDs, BUILDINGs = [], [
-    # Building('test', BUILDING_TYPE.SMALL, benefit=10)
-]
+WINDs, BUILDINGs, UGs = [], [], []
 
 ACTORS = GENs + BATTERYs + UGs + BUSs + PVs + BUILDINGs + WINDs + LOADs
 
@@ -180,7 +165,7 @@ names = Node('names',
 ### Simulation
 time_step = Node('time_step', units='s',
     description='seconds since last time calculation')
-elapsed_hours = Node('elapsed hours', 0, 
+elapsed_hours = Node('elapsed_hours', 0, 
     description='number of hours that have passed during the simulation.')
 elapsed_minutes = Node('elapsed_minutes', 0,
     description='number of minutes that have passed during the simulation.')
@@ -199,7 +184,7 @@ max_hour_index = Node('max_hour_index',
     description='maximum hour index for the year')
 is_leapyear = Node('is leapyear', 
     description='true if the current year is a leapyear')
-tol = Node('tolerance', 0.5, description='float tolerance to be ignored')
+tol = Node('tolerance', 0.001, description='float tolerance to be ignored')
 
 ### Components
 is_islanded = Node('is islanded', 
@@ -458,7 +443,7 @@ sg.add_edge(keyed_receiving_nodes | {'names': names, 'key_sep': key_sep},
 
 #### Demand vector
 actor_lists = [UGs, BUSs, PVs, WINDs, LOADs, BUILDINGs, GENs, BATTERYs]
-s_dynamic = [[], [], ['supply'], ['supply'], [], [], [], ['cost']]
+s_dynamic = [[], [], ['supply'], ['supply'], [], [], [], ['cost', 'supply']]
 d_dynamic = [[], [], [], [], ['req_demand', 'max_demand'], ['req_demand', 'max_demand'], [], ['benefit', 'max_demand']]
 
 demand_sources, dynamic_sources, i = {}, [], 0
@@ -655,15 +640,21 @@ for G in GENs:
 for B in BATTERYs:
     sg.add_edge(B.state, B.is_charging, lambda s1, **kw : s1 < 0)
 
-    sg.add_edge(B.max_output, B.supply, R.Rfirst)
+    sg.add_edge({'output': B.max_output, 
+                 'level': B.charge_level}, 
+                 target=B.supply, 
+                 rel=R.Rmin,
+                 disposable=['level']
+                )
 
     sg.add_edge({'state': B.state, 
                  'level': B.charge_level, 
                  'max_level': B.charge_capacity,
-                 'time_step': time_step}, 
+                 'time_step': time_step,
+                 'efficiency': B.charge_efficiency}, 
                 target=B.charge_level, 
                 rel=Rcalc_battery_charge_level, 
-                label='calc battery charge level',
+                label='calc_battery_charge_level',
                 disposable=['level', 'state'],
                 index_via=lambda state, level, **kw: R.Rsame(state-1, level)
                 )
@@ -768,6 +759,7 @@ for B in BATTERYs:
     sg.add_edge({'level': B.charge_level, 
                  'capacity': B.charge_capacity},
                 target=B.benefit, 
+                label='calc_battery_benefit',
                 disposable=['level'],
                 rel=Rcalc_battery_benefit_spanagel,
                 )

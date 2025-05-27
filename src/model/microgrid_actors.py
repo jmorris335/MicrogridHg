@@ -98,7 +98,7 @@ class GridActor:
             description=f'Values for calculating {name} demand',
             )
         default_s_tuple = (name,*[kwargs.get(l, None) 
-                                  for l in ['cost', 'supply']])
+                                  for l in ['cost', 'supply', 'is_cost_per_unit']])
         self.supply_tuple = Node(
             f'supply_tuple_{name}',
             # None if None in default_s_tuple else default_s_tuple,
@@ -206,7 +206,7 @@ class Battery(GridActor):
     distribution."""
     def __init__(self, name: str, charge_level: float=None, 
                  charge_capacity: float=None, max_output: float=None, 
-                 efficiency: float=None, max_charge_rate: float=None, 
+                 charge_efficiency: float=None, max_charge_rate: float=None, 
                  scarcity_factor: float=None, trickle_prop: float=None, 
                  **kwargs):
         defaults = dict(
@@ -238,10 +238,10 @@ class Battery(GridActor):
             description='max power battery can output',
             units='kW',
             )
-        self.efficiency = Node(
+        self.charge_efficiency = Node(
             f'efficiency_{name}',
-            efficiency, 
-            description='efficiency of battery'
+            charge_efficiency, 
+            description='efficiency of battery charging'
             )
         self.max_charge_rate = Node(
             f'max_charge_rate_{name}',

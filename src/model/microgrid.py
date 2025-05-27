@@ -69,7 +69,7 @@ BATTERYs = [
         charge_capacity=10000.,
         charge_level=1050., 
         max_output=500.,
-        efficiency=0.45,
+        charge_efficiency=0.95,
         max_charge_rate=2.,
         scarcity_factor=1.5,
         trickle_prop=0.8,
@@ -187,8 +187,8 @@ names = Node('names',
     description='ordered list of names of actors considered in the model')
 
 ### Simulation
-time_step = Node('time_step', units='s',
-    description='seconds since last time calculation')
+time_step = Node('time_step', units='hr',
+    description='hours since last time calculation')
 elapsed_hours = Node('elapsed hours', 0, 
     description='number of hours that have passed during the simulation.')
 elapsed_minutes = Node('elapsed_minutes', 0,
@@ -208,7 +208,7 @@ max_hour_index = Node('max_hour_index',
     description='maximum hour index for the year')
 is_leapyear = Node('is leapyear', 
     description='true if the current year is a leapyear')
-tol = Node('tolerance', 0.5, description='float tolerance to be ignored')
+tol = Node('tolerance', 0.001, description='float tolerance to be ignored')
 
 ### Components
 is_islanded = Node('is islanded', 
@@ -467,7 +467,7 @@ mg.add_edge(keyed_receiving_nodes | {'names': names, 'key_sep': key_sep},
 
 #### Demand vector
 actor_lists = [UGs, BUSs, PVs, WINDs, LOADs, BUILDINGs, GENs, BATTERYs]
-s_dynamic = [[], [], ['supply'], ['supply'], [], [], [], ['cost']]
+s_dynamic = [[], [], ['supply'], ['supply'], [], [], [], ['cost', 'supply']]
 d_dynamic = [[], [], [], [], ['req_demand', 'max_demand'], ['req_demand', 'max_demand'], [], ['benefit', 'max_demand']]
 
 demand_sources, dynamic_sources, i = {}, [], 0
@@ -664,13 +664,18 @@ for G in GENs:
 for B in BATTERYs:
     mg.add_edge(B.state, B.is_charging, lambda s1, **kw : s1 < 0)
 
-    mg.add_edge(B.max_output, B.supply, R.Rfirst)
+    mg.add_edge({'output': B.max_output, 
+                 'level': B.charge_level}, 
+                 target=B.supply, 
+                 rel=R.Rmin,
+                 disposable=['level'])
 
     mg.add_edge({'state': B.state, 
                  'level': B.charge_level, 
                  'max_level': B.charge_capacity,
-                 'time_step': time_step}, 
-                target=B.charge_level, 
+                 'time_step': time_step,
+                 'efficiency': B.charge_efficiency}, 
+                target=B.charge_level,
                 rel=Rcalc_battery_charge_level, 
                 label='calc battery charge level',
                 disposable=['level', 'state'],
