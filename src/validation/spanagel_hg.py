@@ -614,7 +614,8 @@ for G in GENs:
                           R.Rsame(refuel_time, curr_hour, curr_level)
                 )
     sg.add_edge({'load': G.state,
-                 'max_load': G.max_output},
+                 'max_load': G.max_output,
+                 'time_step': time_step},
                 target=G.consumption,
                 rel=Rcalc_generator_fuel_consumption,
                 disposable=['load'],
@@ -623,7 +624,8 @@ for G in GENs:
     #Added in response to Issue #6 in ConstraintHg regarding resolving duplicate nodes
     sg.add_edge(G.max_output, f'max_output{GENs.index(G)}', R.Rfirst)
     sg.add_edge({'load': f'max_output{GENs.index(G)}',
-                 'max_load': G.max_output},
+                 'max_load': G.max_output,
+                 'time_step': time_step},
                 target=G.max_consumption,
                 rel=Rcalc_generator_fuel_consumption,
                 )

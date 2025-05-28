@@ -180,13 +180,13 @@ class Generator(GridActor):
             f'consumption_{name}',
             kwargs.get('consumpation', None),
             description='fuel consumption for generator',
-            units='L/h',
+            units='liters',
             )
         self.max_consumption = Node(
             f'max_consumption_{name}',
             kwargs.get('max_consumpation', None), 
             description='max fuel consumption for generator',
-            units='L/h',
+            units='liters',
             )
         self.fuel_level = Node(
             f'fuel_level_{name}',

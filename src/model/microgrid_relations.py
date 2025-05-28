@@ -268,7 +268,7 @@ def Rcalc_generator_fuel_level(refuel_time: int, curr_hour: int, curr_level: flo
     return max_level
 
 def Rcalc_generator_fuel_consumption(load: float, max_load: float, 
-                                     *args, **kwargs)-> float:
+                                     time_step: float, *args, **kwargs)-> float:
     """Determines the fuel consumption of the generator. Data taken from
     https://generator.kubota.com/products/60hz/gl_7000.html, and are given
     in L/h."""
@@ -277,7 +277,9 @@ def Rcalc_generator_fuel_consumption(load: float, max_load: float,
     load_prop_intervals = [0.75, 0.5, 0.25, 0.]
     diff = [abs(load_prop - i) for i in load_prop_intervals]
     index = diff.index(min(diff))
-    return consumption_rates[index]
+    rate = consumption_rates[index]
+    consumption = rate * time_step
+    return consumption
 
 def Rcalc_generator_cost(fuel_cost: float, consumption: float, **kwargs)-> float:
     """Determines the cost of running the generator."""
