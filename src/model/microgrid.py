@@ -150,6 +150,8 @@ days_in_leapyear = Node('days_in_leapyear', description='number of days in a lea
 hours_in_day = Node('hours_in_day', 24, description='number of hours in a day')
 hours_in_year = Node('hours_in_year', description='number of hours in a year')
 hours_in_leapyear = Node('hours_in_leapyear', description='number of hours in a leapyear')
+seconds_in_minute = Node('seconds_in_minute', 60, description='number of seconds in a minute')
+minutes_in_hour = Node('minutes_in_hour', 60, description='number of minutes in an hour')
 
 ### Setup Conditions
 island_mode = Node('island_mode', 
@@ -185,10 +187,12 @@ names = Node('names',
 ### Simulation
 time_step = Node('time_step', units='hr',
     description='hours since last time calculation')
+time = Node('time', units='s',
+    description='total seconds passed during the simulation')
 elapsed_hours = Node('elapsed_hours', 0, 
-    description='number of hours that have passed during the simulation.')
+    description='number of hours that have passed during the simulation')
 elapsed_minutes = Node('elapsed_minutes', 0,
-    description='number of minutes that have passed during the simulation.')
+    description='number of minutes that have passed during the simulation')
 start_year = Node('start year', description='starting year for the simulation')
 start_day = Node('start day', 
     description='starting day for the simulation (1-366)')
@@ -279,6 +283,10 @@ mg.add_edge({'start_year': start_year,
             rel=Rcalc_num_leapyears,
             label='calc_num_leapyears',
             )
+mg.add_edge({'time': time, 'step': time_step}, R.Rsum, index_offset=1)
+
+mg.add_edge(time, elapsed_hours, Rcalc_elapsed_hours)
+
 mg.add_edge(elapsed_hours, elapsed_hours, R.Rincrement, index_offset=1)
 
 mg.add_edge({'elapsed_hours': elapsed_hours,

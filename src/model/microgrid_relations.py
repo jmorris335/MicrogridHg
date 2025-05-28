@@ -89,6 +89,11 @@ def Rcalc_year_is_leapyear(year: int, **kwargs)-> bool:
     is_leapyear = year % 4 == 0
     return is_leapyear
 
+def Rcalc_elapsed_hours(time: float, seconds_in_hour: int, **kwargs)-> int:
+    """Calculates the number of hours that have passed."""
+    hours = time // seconds_in_hour
+    return hours
+
 def Rcalc_elapsed_minutes(elapsed_hours: int, **kwargs)-> int:
     """Returns the number of minutes passed in the simulation."""
     minutes = elapsed_hours * 60
