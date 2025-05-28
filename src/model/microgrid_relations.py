@@ -92,12 +92,12 @@ def Rcalc_year_is_leapyear(year: int, **kwargs)-> bool:
 def Rcalc_elapsed_hours(time: float, seconds_in_hour: int, **kwargs)-> int:
     """Calculates the number of hours that have passed."""
     hours = time // seconds_in_hour
-    return hours
+    return int(hours)
 
 def Rcalc_elapsed_minutes(time: int, seconds_in_minute: int, **kwargs)-> int:
     """Returns the number of minutes passed in the simulation."""
     minutes = time // seconds_in_minute
-    return minutes
+    return int(minutes)
 
 
 ### Data
@@ -194,7 +194,6 @@ def Rcalc_ug_demand(conn: bool, islanded_balance: float, *args, **kwargs)-> floa
         return 0.
     return abs(islanded_balance)
 
-
 ## Solar
 def Rget_solar_filename(directory: str, year: str, **kwargs)-> str:
     """Returns the name of the CSV file with the solar data 
@@ -286,9 +285,13 @@ def Rcalc_generator_fuel_consumption(load: float, max_load: float, time_step: fl
     consumption = rate * time_step / seconds_in_hour
     return consumption
 
-def Rcalc_generator_cost(fuel_cost: float, consumption: float, **kwargs)-> float:
-    """Determines the cost of running the generator."""
-    cost = fuel_cost * consumption
+def Rcalc_generator_cost(fuel_cost: float, consumption: float, time_step: int, 
+                         output: float, seconds_in_hour: int, **kwargs)-> float:
+    """Determines the cost of running the generator ($/kWh)."""
+    fuel_cost = fuel_cost * consumption
+    hours_in_step = time_step / seconds_in_hour
+    power_over_step = output * hours_in_step
+    cost = fuel_cost / power_over_step
     return cost
 
 ## Batteries

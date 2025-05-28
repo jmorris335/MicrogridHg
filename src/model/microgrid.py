@@ -299,8 +299,14 @@ mg.add_edge({'time': time,
              'seconds_in_hour': seconds_in_hour}, 
             target=elapsed_hours,
             rel=Rcalc_elapsed_hours,
-            disposable=['time'])
-
+            disposable=['time'],
+            )
+mg.add_edge({'time': time,
+             'seconds_in_minute': seconds_in_minute},
+            target=elapsed_minutes,
+            rel=Rcalc_elapsed_minutes,
+            disposable=['time'],
+            )
 mg.add_edge({'elapsed_hours': elapsed_hours,
              'start_year': start_year, 
              'num_leapyears': num_leapyears,
@@ -664,7 +670,10 @@ for G in GENs:
                 rel=Rcalc_generator_fuel_consumption,
                 )
     mg.add_edge({'fuel_cost': cost_of_diesel,
-                 'consumption': G.max_consumption},
+                 'consumption': G.max_consumption,
+                 'time_step': time_step,
+                 'output': G.max_output,
+                 'seconds_in_hour': seconds_in_hour},
                 target=G.cost,
                 rel=Rcalc_generator_cost,
                 )

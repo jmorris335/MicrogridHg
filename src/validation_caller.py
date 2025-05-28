@@ -18,10 +18,10 @@ debug_nodes = {'state_vector'} if False else None
 debug_edges = {'calc_battery_charge_level'} if True else None
 
 # Solve for a single node
-t = sg.solve(target=BATTERYs[0].state,
+t = sg.solve(target=BATTERYs[0].soc,
              inputs=inputs,
-             min_index=3, 
-             search_depth=3000, to_print=False,
+             min_index=0, 
+             search_depth=100000, to_print=False,
              debug_nodes=debug_nodes, debug_edges=debug_edges, 
              logging_level=logging.INFO)
 
@@ -30,8 +30,9 @@ if t is not None:
 else:
     print("No solutions found")
 
-nodes_to_solve = [PVs[0].state]
-# solve_and_plot(sg, nodes_to_solve, inputs, [43 for a in nodes_to_solve])
+# t = sg.solve(state_vector, min_index=1000, inputs=inputs)
+# plot_time_values([battery1_is_deep_charging.label, BATTERYs[0].soc.label], t.values, 'time')
+# solve_and_plot(sg, nodes_to_solve, inputs, [20 for a in nodes_to_solve])
 
 # Solve for and plot actor states
-solve_and_plot_states(sg, inputs, 1000)
+solve_and_plot_states(sg, inputs, 2500, search_depth=500000)

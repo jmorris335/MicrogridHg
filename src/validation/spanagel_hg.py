@@ -73,6 +73,8 @@ valid_data = Node('validation_data')
 time_column = Node('time_data_column', 1)
 pv_power_label = Node('pv_power_label', 'Solar Power (kW)')
 load_label = Node('node_label', 'Powerload (kW)')
+battery1_is_deep_charging = Node('battery1_is_deep_charging', False,
+    description='True if battery is going through a full recharge')
 
 
 
@@ -275,8 +277,14 @@ sg.add_edge({'time': time,
              'seconds_in_hour': seconds_in_hour}, 
             target=elapsed_hours,
             rel=Rcalc_elapsed_hours,
-            disposable=['time'])
-
+            disposable=['time'],
+            )
+sg.add_edge({'time': time,
+             'seconds_in_minute': seconds_in_minute},
+            target=elapsed_minutes,
+            rel=Rcalc_elapsed_minutes,
+            disposable=['time'],
+            )
 sg.add_edge({'elapsed_hours': elapsed_hours,
              'start_year': start_year, 
              'num_leapyears': num_leapyears,
@@ -606,8 +614,8 @@ for G in GENs:
                 )
     sg.add_edge({'init': G.starting_fuel_level, 
                  'max': G.fuel_capacity}, 
-                G.fuel_level, 
-                R.Rmin,
+                target=G.fuel_level, 
+                rel=R.Rmin,
                 )
     sg.add_edge({'refuel_time': next_refuel_hour, 
                  'curr_hour': hour_idx, 
@@ -620,14 +628,14 @@ for G in GENs:
                 index_via=lambda refuel_time, curr_hour, curr_level, **kw : 
                           R.Rsame(refuel_time, curr_hour, curr_level)
                 )
-    sg.add_edge({'load': G.state,
-                 'max_load': G.max_output,
-                 'seconds_in_hour': seconds_in_hour,
-                 'time_step': time_step},
-                target=G.consumption,
-                rel=Rcalc_generator_fuel_consumption,
-                disposable=['load'],
-                )
+    # sg.add_edge({'load': G.state,
+    #              'max_load': G.max_output,
+    #              'seconds_in_hour': seconds_in_hour,
+    #              'time_step': time_step},
+    #             target=G.consumption,
+    #             rel=Rcalc_generator_fuel_consumption,
+    #             disposable=['load'],
+    #             )
     
     #Added in response to Issue #6 in ConstraintHg regarding resolving duplicate nodes
     sg.add_edge(G.max_output, f'max_output{GENs.index(G)}', R.Rfirst)
@@ -639,8 +647,10 @@ for G in GENs:
                 rel=Rcalc_generator_fuel_consumption,
                 )
     sg.add_edge({'fuel_cost': cost_of_diesel,
+                 'consumption': G.max_consumption,
+                 'time_step': time_step,
                  'output': G.max_output,
-                 'consumption': G.max_consumption},
+                 'seconds_in_hour': seconds_in_hour},
                 target=G.cost,
                 rel=Rcalc_generator_cost,
                 )
@@ -655,9 +665,8 @@ for B in BATTERYs:
                  'level': B.charge_level}, 
                  target=B.supply, 
                  rel=R.Rmin,
-                 disposable=['level']
+                 disposable=['level'],
                 )
-
     sg.add_edge({'state': B.state, 
                  'level': B.charge_level, 
                  'max_level': B.charge_capacity,
@@ -710,34 +719,33 @@ for B in BATTERYs:
 ###################################################
 
 ## Relationships
-def Rcalc_battery_cost_spanagel(is_charging: bool, trickle_prop: float, 
-                                tol: float, level: float, capacity: float):
+def Rcalc_battery_cost_spanagel(is_deep_charging: bool, tol: float, soc: float, 
+                                **kwargs)-> float:
     """Calculate the cost of using the battery."""
-    if level <= tol:
+    if soc <= tol:
         return float('inf')
-    if level > capacity * trickle_prop:
-        return 0.1
-    elif level < capacity * 0.5:
-        return 100
-    elif is_charging:
-        return 0.2
+    if is_deep_charging:
+        return 0.5
+    if soc < 0.5:
+        return 10
     return 0.1
 
-def Rcalc_battery_benefit_spanagel(level: float, capacity:float, **kwargs):
+def Rcalc_battery_benefit_spanagel(level: float, capacity:float, **kwargs)-> float:
     """Calculate the benefit of charging the battery."""
     if level >= capacity:
         return 0.0
     return 0.05
 
+def Rcalc_battery_deep_charging(soc: float, prev_is_dc: bool, **kwargs)-> bool:
+    """Calculates if the battery should be deep charging"""
+    if soc < 0.51:
+        return True
+    if soc > 0.9:
+        return False
+    return prev_is_dc
+
 ## Edges
 sg.add_edge(valid_data_path, valid_data, Rget_data_from_csv_file)
-
-sg.add_edge({'time': time,
-             'seconds_in_minute': seconds_in_minute},
-            target=elapsed_minutes,
-            rel=Rcalc_elapsed_minutes,
-            disposable=['time']
-            )
 
 for PV in PVs:
     sg.add_edge({'csv_data': valid_data,
@@ -762,16 +770,15 @@ for L in LOADs:
     sg.add_edge(L.normal_load, L.req_demand, R.Rfirst)
     
 for B in BATTERYs:
-    sg.add_edge({'is_charging': B.is_charging, 
-                 'trickle_prop': B.trickle_prop,
+    sg.add_edge({'is_deep_charging': battery1_is_deep_charging, 
                  'tol': tol, 
-                 'level': B.charge_level, 
-                 'capacity': B.charge_capacity}, 
+                 'soc': B.soc}, 
                 target=B.cost, 
                 rel=Rcalc_battery_cost_spanagel,
                 label='calc_battery_cost',
-                disposable=['level', 'is_charging'],
-                index_via=lambda level, is_charging, **kw : R.Rsame(level, is_charging),
+                disposable=['soc', 'is_deep_charging'],
+                index_via=lambda soc, is_deep_charging, **kw :
+                    R.Rsame(soc, is_deep_charging),
                 )
     sg.add_edge({'level': B.charge_level, 
                  'capacity': B.charge_capacity},
@@ -779,4 +786,11 @@ for B in BATTERYs:
                 label='calc_battery_benefit',
                 disposable=['level'],
                 rel=Rcalc_battery_benefit_spanagel,
+                )
+    sg.add_edge({'soc': B.soc,
+                 'prev_is_dc': battery1_is_deep_charging},
+                target=battery1_is_deep_charging,
+                rel=Rcalc_battery_deep_charging,
+                edge_props=['LEVEL', 'DISPOSE_ALL'],
+                index_offset=1,
                 )

@@ -45,24 +45,24 @@ class GridActor:
             f'benefit_{name}',
             kwargs.get('benefit', None),
             description=f'Benefit of meeting {name}\'s demand',
-            units='$/kW',
+            units='$/kWh',
             )
         self.cost = Node(
             f'cost_{name}',
             kwargs.get('cost', None),
             description=f'Cost of generating {name}\'s supply',
-            units='$/kW',
+            units='$/kWh',
             )
         self.req_demand = Node(
             f'req_demand_{name}',
             kwargs.get('req_demand', None),
-            description=f'Minimum load required for the actor to operate',
+            description=f'Minimum power required for the actor to operate',
             units='kW',
             )
         self.max_demand = Node(
             f'max_demand_{name}',
             kwargs.get('max_demand', None),
-            description=f'Maximum load that the actor can receive',
+            description=f'Maximum power that the actor can receive',
             units='kW',
             )
         self.supply = Node(
