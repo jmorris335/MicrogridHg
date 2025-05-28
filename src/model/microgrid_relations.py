@@ -140,17 +140,16 @@ def Rform_connectivity_matrix(names: list, key_sep: str, *args, **kwargs)-> np.n
     """Forms the connectivity (A) matrix where the ij-th cell indicates 
     power is flowing from object j to object i."""
     A = np.zeros((len(names), len(names)))
-    # args, kwargs = R.get_keyword_arguments(args, kwargs, KEYNAMES)
     for key, val in kwargs.items():
         if key_sep in key:
             i,j = [names.index(name) for name in key.split(key_sep)[:2]]
             A[i][j] = 1 if bool(val) else 0
     return A
 
-def Rget_state_from_matrix(x: np.ndarray, name: str, names: list, **kwargs)-> float:
+def Rget_state_from_vector(x: np.ndarray, name: str, names: list, **kwargs)-> float:
     """Indexes and returns the state of the object in the state matrix."""
-    i = names.index(name)
-    out = x[i]
+    idx = names.index(name)
+    out = x[idx]
     return out
 
 def Rlinear_solve(A: np.ndarray, B: np.ndarray, **kwargs)-> np.ndarray:
@@ -180,6 +179,7 @@ def Rdetermine_if_loadshedding(state: float, req_demand: float, tol: float)-> bo
     if req_demand > tol:
         return state > tol
     return False
+
 
 ## Utility Grid
 def Rcalc_ug_demand(conn: bool, islanded_balance: float, *args, **kwargs)-> float:

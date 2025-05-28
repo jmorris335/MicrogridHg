@@ -85,7 +85,7 @@ def plot_time_values(labels: list, found_values: dict, time_step: float,
     plt.show()
 
 def solve_and_plot_states(mg: chg.Hypergraph, inputs: dict, min_index: int=8,
-                          state_vector: str='state_matrix',):
+                          state_vector: str='state_vector',):
     """Solves the Hypergraph for the `state_vector`, then plots the 
     state of each actor on the grid."""
     t = mg.solve(state_vector, inputs=inputs, min_index=min_index)

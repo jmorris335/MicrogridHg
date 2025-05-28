@@ -368,7 +368,7 @@ for ACTOR in ACTORS:
                  'name': ACTOR.name,
                  'names': names}, 
                 target=ACTOR.state, 
-                rel=Rget_state_from_matrix, 
+                rel=Rget_state_from_vector, 
                 label=f'retrieve state of {str(ACTOR)}', index_offset=1
                 )
     for SRC in ACTORS:
