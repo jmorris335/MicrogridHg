@@ -464,7 +464,7 @@ dynamic_sources.append('conn')
 
 sg.add_edge(demand_sources,
             target=demand_vector,
-            rel=Rmake_demand_vector,
+            rel=Rmake_state_vector,
             label='make_demand_vector',
             disposable=dynamic_sources,
             index_via = lambda **kwargs : 

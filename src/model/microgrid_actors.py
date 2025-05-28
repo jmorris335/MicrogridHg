@@ -173,7 +173,7 @@ class Generator(GridActor):
         self.max_output = Node(
             f'max_output_{name}',
             max_output, 
-            description='max charge generator can output',
+            description='max power generator can output',
             units='kW',
             )
         self.consumption = Node(

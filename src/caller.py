@@ -14,11 +14,11 @@ inputs = {
 }
 
 # Debugging options, also set logging_level to 12 or lower
-debug_nodes = {'state_matrix'} if False else None
-debug_edges = {'make_demand_matrix'} if False else None
+debug_nodes = {'state_vector'} if False else None
+debug_edges = {'make_state_vector'} if False else None
 
 # Solve for a single node
-t = mg.solve(target=state_matrix,
+t = mg.solve(target=state_vector,
              inputs=inputs, min_index=3, 
              search_depth=3000, to_print=False,
              debug_nodes=debug_nodes, debug_edges=debug_edges, 

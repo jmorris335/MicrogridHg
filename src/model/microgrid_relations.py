@@ -337,9 +337,9 @@ def Rcalc_battery_max_demand(level: float, capacity: float, max_rate: float,
 
 ## Power distribution strategy
 #TODO: Eventually this should be unabstracted into the hypergraph, but for now its considered a black-box mapping.
-def Rmake_demand_vector(conn: list, names: list, tol: float, 
+def Rmake_state_vector(conn: list, names: list, tol: float, 
                        *args, **kwargs)->list:
-    """Determines the demand for each object on the grid.
+    """Determines the state for each object on the grid.
 
     Parameters
     ----------

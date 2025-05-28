@@ -14,7 +14,7 @@ inputs = {
 }
 
 # Debugging options, also set logging_level to 12 or lower
-debug_nodes = {'state_matrix'} if False else None
+debug_nodes = {'state_vector'} if False else None
 debug_edges = {'calc_battery_charge_level'} if True else None
 
 # Solve for a single node

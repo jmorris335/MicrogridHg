@@ -158,7 +158,6 @@ has_random_failure = Node('has_random_failure', False,
     description='true if random failure is allowed')
 use_random_date = Node('use_random_date', True, 
     description='true if the start date is set randomly')
-# num_mc_iterations = Node('num_mc_iterations', 1000, description='number of Monte Carlo iterations')
 min_year = Node('min year', 2000, description='minimum year of simulation data')
 max_year = Node('max year', 2009, description='maximum year of simulation data')
 prob_daily_refueling = Node('prob of daily refueling', 0.25, 
@@ -167,11 +166,8 @@ prob_daily_refueling = Node('prob of daily refueling', 0.25,
 ### Grid
 conn_matrix = Node('connectivity matrix', 
     description='cell ij indicates actor[i] receives power from actor[j]')
-demand_vector = Node('demand vector', 
-    description='desired state for each actor on the grid')
-state_matrix = Node('state_matrix', 
+state_vector = Node('state_vector', 
     description='state from each actor on the grid')
-# total_load = Node('total_load', description='total power required to run the microgrid')
 islanded_balance = Node('islanded_balance', description='balance of grid sans Utility Grid')
 total_power_balance = Node('total power supplied', 0., 
     description='total balance of power supplied (+) or demanded (-) by grid (W)')
@@ -333,16 +329,7 @@ mg.add_edge({'day': day,
 mg.add_edge(year, is_leapyear, Rcalc_year_is_leapyear)
 
 ### Grid
-# mg.add_edge({'A': conn_matrix,
-#              'B': demand_vector},
-#             target=state_matrix,
-#             rel=Rlinear_solve, 
-#             label='solve state matrix',
-#             edge_props=['LEVEL', 'DISPOSE_ALL']
-# )
-mg.add_edge(demand_vector, state_matrix, R.Rfirst) #TODO: removing matrix solving due to singularities
-
-mg.add_edge(state_matrix, 
+mg.add_edge(state_vector, 
             target=total_power_balance, 
             rel=lambda s1, **kwargs : sum(s1),
             index_offset=1
@@ -354,7 +341,7 @@ mg.add_edge({'wasted': power_wasted,
             index_offset=1,
             edge_props=['LEVEL', 'DISPOSE_ALL']
             )
-mg.add_edge(state_matrix,
+mg.add_edge(state_vector,
             target=num_loads, 
             rel=lambda s1, **kw : sum([a > 0 for a in s1]),
             )
@@ -388,7 +375,7 @@ for ACTOR in ACTORS:
                 rel=lambda **kwargs : 0., 
                 via=lambda s1, **kwargs : s1 is False
                 )
-    mg.add_edge({'x': state_matrix,
+    mg.add_edge({'x': state_vector,
                  'name': ACTOR.name,
                  'names': names}, 
                 target=ACTOR.state, 
@@ -465,7 +452,7 @@ mg.add_edge(keyed_receiving_nodes | {'names': names, 'key_sep': key_sep},
             index_via=lambda **kwargs : R.Rsame(*[kwargs[key] for key in keyed_receiving_nodes])
             )
 
-#### Demand vector
+#### State vector
 actor_lists = [UGs, BUSs, PVs, WINDs, LOADs, BUILDINGs, GENs, BATTERYs]
 s_dynamic = [[], [], ['supply'], ['supply'], [], [], [], ['cost', 'supply']]
 d_dynamic = [[], [], [], [], ['req_demand', 'max_demand'], ['req_demand', 'max_demand'], [], ['benefit', 'max_demand']]
@@ -487,9 +474,9 @@ demand_sources.update({'conn': conn_matrix, 'names': names, 'tol': tol})
 dynamic_sources.append('conn')
 
 mg.add_edge(demand_sources,
-            target=demand_vector,
-            rel=Rmake_demand_vector,
-            label='make_demand_vector',
+            target=state_vector,
+            rel=Rmake_state_vector,
+            label='make_state_vector',
             disposable=dynamic_sources,
             index_via = lambda **kwargs : 
                 R.Rsame(*[kwargs[key] for key in dynamic_sources if key in kwargs]),
