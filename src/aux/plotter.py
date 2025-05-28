@@ -58,7 +58,7 @@ def plot_time_values(labels: list, found_values: dict, time_step: float,
     dashes = ['--', ':', '-.']
     legend = []
     if isinstance(time_step, str):
-        times = found_values[time_step]
+        times = [t / 3600 for t in found_values[time_step]]
     for label in labels:
         dash = dashes[labels.index(label) % len(dashes)]
         if isinstance(label, chg.Node):
@@ -68,7 +68,7 @@ def plot_time_values(labels: list, found_values: dict, time_step: float,
             legend_label = label
         values = found_values[label]
         if not isinstance(time_step, str):
-            times = [time_step * i for i in range(len(values))]
+            times = [time_step * i / 3600 for i in range(len(values))]
         # plt.plot(times[:len(values)], values[:len(times)], 'k', lw=2, linestyle=dash) 
         plt.plot(times[:len(values)], values[:len(times)], lw=2) 
         legend.append(legend_label)
@@ -85,19 +85,19 @@ def plot_time_values(labels: list, found_values: dict, time_step: float,
     plt.show()
 
 def solve_and_plot_states(mg: chg.Hypergraph, inputs: dict, min_index: int=8,
-                          state_vector: str='state_vector',):
+                          state_vector: str='state_vector', time: str='time'):
     """Solves the Hypergraph for the `state_vector`, then plots the 
     state of each actor on the grid."""
     t = mg.solve(state_vector, inputs=inputs, min_index=min_index)
     fv = t.values
     names = fv.get('names', [mg.solve('names', inputs=inputs).value])[0]
     states = defaultdict(list)
-    states['elapsed_hours'] = fv['elapsed_hours']
+    states['time'] = fv['time']
     for sv in fv[state_vector]:
         for state_value, name in zip(sv, names):
             if 'bus' in name.lower():
                 continue
             states[name].append(state_value)
     outnames = [n for n in names if 'bus' not in n.lower()]
-    plot_time_values(outnames, states, 'elapsed_hours', 
+    plot_time_values(outnames, states, time, 
                      title='States of Grid Actors', ylabel='Power (kW)')

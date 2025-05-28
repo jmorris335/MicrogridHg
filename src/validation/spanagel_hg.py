@@ -126,6 +126,9 @@ days_in_leapyear = Node('days_in_leapyear', description='number of days in a lea
 hours_in_day = Node('hours_in_day', 24, description='number of hours in a day')
 hours_in_year = Node('hours_in_year', description='number of hours in a year')
 hours_in_leapyear = Node('hours_in_leapyear', description='number of hours in a leapyear')
+seconds_in_minute = Node('seconds_in_minute', 60, description='number of seconds in a minute')
+minutes_in_hour = Node('minutes_in_hour', 60, description='number of minutes in an hour')
+seconds_in_hour = Node('seconds_in_hour', description='num seconds in an hour')
 
 ### Setup Conditions
 island_mode = Node('island_mode', 
@@ -159,12 +162,14 @@ names = Node('names',
     description='ordered list of names of actors considered in the model')
 
 ### Simulation
-time_step = Node('time_step', units='s',
-    description='seconds since last time calculation')
-elapsed_hours = Node('elapsed_hours', 0, 
-    description='number of hours that have passed during the simulation.')
+time_step = Node('time_step', units='hr',
+    description='hours since last time calculation')
+time = Node('time', 0, units='s',
+    description='total seconds passed during the simulation')
+elapsed_hours = Node('elapsed_hours', 
+    description='number of hours that have passed during the simulation')
 elapsed_minutes = Node('elapsed_minutes', 0,
-    description='number of minutes that have passed during the simulation.')
+    description='number of minutes that have passed during the simulation')
 start_year = Node('start year', description='starting year for the simulation')
 start_day = Node('start day', 
     description='starting day for the simulation (1-366)')
@@ -255,7 +260,22 @@ sg.add_edge({'start_year': start_year,
             rel=Rcalc_num_leapyears,
             label='calc_num_leapyears',
             )
-sg.add_edge(elapsed_hours, elapsed_hours, R.Rincrement, index_offset=1)
+sg.add_edge({'time': time, 
+             'step': time_step}, 
+            target=time,
+            rel=R.Rsum,
+            index_offset=1,
+            )
+sg.add_edge({'sec_in_min': seconds_in_minute,
+             'min_in_hour': minutes_in_hour},
+             target=seconds_in_hour,
+             rel=R.Rmultiply,
+             )
+sg.add_edge({'time': time, 
+             'seconds_in_hour': seconds_in_hour}, 
+            target=elapsed_hours,
+            rel=Rcalc_elapsed_hours,
+            disposable=['time'])
 
 sg.add_edge({'elapsed_hours': elapsed_hours,
              'start_year': start_year, 
@@ -481,7 +501,7 @@ sg.add_edge({'directory': sunlight_directory,
             Rget_solar_filename,
             )
 
-# shg.add_edge(sunlight_filename, sunlight_data, Rget_data_from_csv_file)
+# sg.add_edge(sunlight_filename, sunlight_data, Rget_data_from_csv_file)
 
 sg.add_edge({'csv_data': sunlight_data,
              'row': hour_idx,
@@ -602,6 +622,7 @@ for G in GENs:
                 )
     sg.add_edge({'load': G.state,
                  'max_load': G.max_output,
+                 'seconds_in_hour': seconds_in_hour,
                  'time_step': time_step},
                 target=G.consumption,
                 rel=Rcalc_generator_fuel_consumption,
@@ -612,6 +633,7 @@ for G in GENs:
     sg.add_edge(G.max_output, f'max_output{GENs.index(G)}', R.Rfirst)
     sg.add_edge({'load': f'max_output{GENs.index(G)}',
                  'max_load': G.max_output,
+                 'seconds_in_hour': seconds_in_hour,
                  'time_step': time_step},
                 target=G.max_consumption,
                 rel=Rcalc_generator_fuel_consumption,
@@ -640,7 +662,8 @@ for B in BATTERYs:
                  'level': B.charge_level, 
                  'max_level': B.charge_capacity,
                  'time_step': time_step,
-                 'efficiency': B.charge_efficiency}, 
+                 'efficiency': B.charge_efficiency,
+                 'seconds_in_hour': seconds_in_hour}, 
                 target=B.charge_level, 
                 rel=Rcalc_battery_charge_level, 
                 label='calc_battery_charge_level',
@@ -653,7 +676,7 @@ for B in BATTERYs:
                 rel=lambda level, capacity, **kw : level / capacity, 
                 edge_props=['LEVEL, DISPOSE_ALL']
                 )
-    # mg.add_edge({'ug_cost': UGs[0].cost, 
+    # sg.add_edge({'ug_cost': UGs[0].cost, 
     #              'tol': tol, 
     #              'level': B.charge_level, 
     #              'capacity': B.charge_capacity, 
@@ -662,7 +685,7 @@ for B in BATTERYs:
     #             disposable=['level'],
     #             rel=Rcalc_battery_cost
     #             )
-    # mg.add_edge({'ug_cost': UGs[0].cost, 
+    # sg.add_edge({'ug_cost': UGs[0].cost, 
     #              'level': B.charge_level, 
     #              'capacity': B.charge_capacity, 
     #              'factor': B.scarcity_factor},
@@ -743,7 +766,7 @@ for B in BATTERYs:
                 rel=Rcalc_battery_cost_spanagel,
                 label='calc_battery_cost',
                 disposable=['level', 'is_charging'],
-                index_via=lambda level, is_charging, **kw : R.Rsame(level, is_charging)
+                index_via=lambda level, is_charging, **kw : R.Rsame(level, is_charging),
                 )
     sg.add_edge({'level': B.charge_level, 
                  'capacity': B.charge_capacity},

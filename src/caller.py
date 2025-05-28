@@ -10,7 +10,7 @@ inputs = {
     start_hour: 12,
     has_random_failure: False,
     island_mode: True,
-    time_step: 1,
+    time_step: 3600,
 }
 
 # Debugging options, also set logging_level to 12 or lower
@@ -18,9 +18,9 @@ debug_nodes = {'state_vector'} if False else None
 debug_edges = {'make_state_vector'} if False else None
 
 # Solve for a single node
-t = mg.solve(target=state_vector,
-             inputs=inputs, min_index=3, 
-             search_depth=3000, to_print=False,
+t = mg.solve(target=BATTERYs[0].soc,
+             inputs=inputs, min_index=0, 
+             search_depth=5000, to_print=False,
              debug_nodes=debug_nodes, debug_edges=debug_edges, 
              logging_level=logging.INFO)
 if t is not None:
@@ -32,5 +32,4 @@ else:
 solve_and_plot_states(mg, inputs, 72)
 
 # Solve for multiple nodes and indices (exhaustive)
-# solve_and_plot(mg, [PVs[0].demand, elapsed_hours, sunlight, 
-#                BUILDINGs[0].demand], inputs, indices=[5, 5, 5, 5])
+# solve_and_plot(mg, [BATTERYs[0].cost, GENs[1].cost], inputs, indices=[0, 0])

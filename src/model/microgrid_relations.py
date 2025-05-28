@@ -272,8 +272,8 @@ def Rcalc_generator_fuel_level(refuel_time: int, curr_hour: int, curr_level: flo
         return curr_level
     return max_level
 
-def Rcalc_generator_fuel_consumption(load: float, max_load: float, 
-                                     time_step: float, *args, **kwargs)-> float:
+def Rcalc_generator_fuel_consumption(load: float, max_load: float, time_step: float,
+                                     seconds_in_hour: int, *args, **kwargs)-> float:
     """Determines the fuel consumption of the generator. Data taken from
     https://generator.kubota.com/products/60hz/gl_7000.html, and are given
     in L/h."""
@@ -283,7 +283,7 @@ def Rcalc_generator_fuel_consumption(load: float, max_load: float,
     diff = [abs(load_prop - i) for i in load_prop_intervals]
     index = diff.index(min(diff))
     rate = consumption_rates[index]
-    consumption = rate * time_step
+    consumption = rate * time_step / seconds_in_hour
     return consumption
 
 def Rcalc_generator_cost(fuel_cost: float, consumption: float, **kwargs)-> float:
@@ -300,24 +300,27 @@ def Rdetermine_battery_is_charging(island: bool, load: float, level: float,
     return level < capacity
 
 def Rcalc_battery_charge_level(state: float, level: float, max_level: float, 
-                               time_step: float, efficiency: float, **kwargs)-> float:
+                               time_step: float, efficiency: float, 
+                               seconds_in_hour: int, **kwargs)-> float:
     """Calculates the charge level of the battery based on power flow (W).
     
     Note that negative state indicates receiving power.
     """
     if state < 0:
         state *= efficiency
-    expected_level = level - state * time_step
+    expected_level = level - state * time_step / seconds_in_hour
     new_level = max(0, min(expected_level, max_level))
     return new_level
 
-def Rcalc_battery_cost(ug_cost: float, tol: float, level: float, 
-                       capacity: float, factor: float, **kwargs):
+def Rcalc_battery_cost(ug_cost: float, tol: float, level: float, capacity: float,
+                       factor: float, is_charging: bool, **kwargs):
     """Calculate the cost of using the battery."""
     if level <= tol:
         return float('inf')
     level_factor = (1 - level / capacity) * factor
     cost = ug_cost + (ug_cost * level_factor)
+    if is_charging:
+        cost * 2.5
     return cost
 
 def Rcalc_battery_benefit(ug_cost: float, level: float, capacity:float, factor: float,

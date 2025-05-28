@@ -67,10 +67,10 @@ BATTERYs = [
     Battery(
         name='Battery1', 
         charge_capacity=10000.,
-        charge_level=1050., 
+        charge_level=10000., 
         max_output=500.,
         charge_efficiency=0.95,
-        max_charge_rate=2.,
+        max_charge_rate=500.,
         scarcity_factor=1.5,
         trickle_prop=0.8,
     ),
@@ -152,6 +152,7 @@ hours_in_year = Node('hours_in_year', description='number of hours in a year')
 hours_in_leapyear = Node('hours_in_leapyear', description='number of hours in a leapyear')
 seconds_in_minute = Node('seconds_in_minute', 60, description='number of seconds in a minute')
 minutes_in_hour = Node('minutes_in_hour', 60, description='number of minutes in an hour')
+seconds_in_hour = Node('seconds_in_hour', description='num seconds in an hour')
 
 ### Setup Conditions
 island_mode = Node('island_mode', 
@@ -187,9 +188,9 @@ names = Node('names',
 ### Simulation
 time_step = Node('time_step', units='hr',
     description='hours since last time calculation')
-time = Node('time', units='s',
+time = Node('time', 0, units='s',
     description='total seconds passed during the simulation')
-elapsed_hours = Node('elapsed_hours', 0, 
+elapsed_hours = Node('elapsed_hours', 
     description='number of hours that have passed during the simulation')
 elapsed_minutes = Node('elapsed_minutes', 0,
     description='number of minutes that have passed during the simulation')
@@ -283,11 +284,22 @@ mg.add_edge({'start_year': start_year,
             rel=Rcalc_num_leapyears,
             label='calc_num_leapyears',
             )
-mg.add_edge({'time': time, 'step': time_step}, R.Rsum, index_offset=1)
-
-mg.add_edge(time, elapsed_hours, Rcalc_elapsed_hours)
-
-mg.add_edge(elapsed_hours, elapsed_hours, R.Rincrement, index_offset=1)
+mg.add_edge({'time': time, 
+             'step': time_step}, 
+            target=time,
+            rel=R.Rsum,
+            index_offset=1,
+            )
+mg.add_edge({'sec_in_min': seconds_in_minute,
+             'min_in_hour': minutes_in_hour},
+             target=seconds_in_hour,
+             rel=R.Rmultiply,
+             )
+mg.add_edge({'time': time, 
+             'seconds_in_hour': seconds_in_hour}, 
+            target=elapsed_hours,
+            rel=Rcalc_elapsed_hours,
+            disposable=['time'])
 
 mg.add_edge({'elapsed_hours': elapsed_hours,
              'start_year': start_year, 
@@ -635,6 +647,7 @@ for G in GENs:
                 )
     mg.add_edge({'load': G.state,
                  'max_load': G.max_output,
+                 'seconds_in_hour': seconds_in_hour,
                  'time_step': time_step},
                 target=G.consumption,
                 rel=Rcalc_generator_fuel_consumption,
@@ -645,6 +658,7 @@ for G in GENs:
     mg.add_edge(G.max_output, f'max_output{GENs.index(G)}', R.Rfirst)
     mg.add_edge({'load': f'max_output{GENs.index(G)}',
                  'max_load': G.max_output,
+                 'seconds_in_hour': seconds_in_hour,
                  'time_step': time_step},
                 target=G.max_consumption,
                 rel=Rcalc_generator_fuel_consumption,
@@ -671,7 +685,8 @@ for B in BATTERYs:
                  'level': B.charge_level, 
                  'max_level': B.charge_capacity,
                  'time_step': time_step,
-                 'efficiency': B.charge_efficiency}, 
+                 'efficiency': B.charge_efficiency,
+                 'seconds_in_hour': seconds_in_hour}, 
                 target=B.charge_level,
                 rel=Rcalc_battery_charge_level, 
                 label='calc battery charge level',
@@ -688,13 +703,15 @@ for B in BATTERYs:
                  'tol': tol, 
                  'level': B.charge_level, 
                  'capacity': B.charge_capacity, 
-                 'factor': B.scarcity_factor}, 
-                target=B.cost, 
-                disposable=['level'],
-                rel=Rcalc_battery_cost
+                 'factor': B.scarcity_factor,
+                 'is_charging': B.is_charging}, 
+                target=B.cost,
+                rel=Rcalc_battery_cost,
+                disposable=['level', 'is_charging'],
+                index_via=lambda level, is_charging, **kw : R.Rsame(level, is_charging),
                 )
     mg.add_edge({'ug_cost': UGs[0].cost, 
-                 'level': B.charge_level, 
+                 'level': B.charge_level,
                  'capacity': B.charge_capacity, 
                  'factor': B.scarcity_factor},
                 target=B.benefit, 

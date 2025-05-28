@@ -10,7 +10,7 @@ inputs = {
     start_year: 2025,
     start_hour: 15,
     has_random_failure: False,
-    time_step: 1,
+    time_step: 3600,
 }
 
 # Debugging options, also set logging_level to 12 or lower
