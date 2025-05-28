@@ -24,7 +24,7 @@ def solve_and_plot(hg: chg.Hypergraph, nodes: list, inputs: dict, indices: list=
                     found_values = solve_and_append(hg, found_values, node, inputs, index, to_print=False, search_depth=5000)
 
     labels = [n.label for n in nodes if n.label in found_values]
-    plot_time_values(labels, found_values, 'elapsed_hours')
+    plot_time_values(labels, found_values, 'time')
 
 def solve_and_append(hg: chg.Hypergraph, found_values: dict, node: chg.Node, inputs: dict, min_index: int, **kwargs):
     """Solves the graph for the node at the given index and adds its value to the dict of found values."""

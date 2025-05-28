@@ -94,9 +94,9 @@ def Rcalc_elapsed_hours(time: float, seconds_in_hour: int, **kwargs)-> int:
     hours = time // seconds_in_hour
     return hours
 
-def Rcalc_elapsed_minutes(elapsed_hours: int, **kwargs)-> int:
+def Rcalc_elapsed_minutes(time: int, seconds_in_minute: int, **kwargs)-> int:
     """Returns the number of minutes passed in the simulation."""
-    minutes = elapsed_hours * 60
+    minutes = time // seconds_in_minute
     return minutes
 
 

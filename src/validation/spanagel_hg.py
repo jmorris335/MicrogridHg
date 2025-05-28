@@ -732,7 +732,12 @@ def Rcalc_battery_benefit_spanagel(level: float, capacity:float, **kwargs):
 ## Edges
 sg.add_edge(valid_data_path, valid_data, Rget_data_from_csv_file)
 
-sg.add_edge(elapsed_hours, elapsed_minutes, Rcalc_elapsed_minutes)
+sg.add_edge({'time': time,
+             'seconds_in_minute': seconds_in_minute},
+            target=elapsed_minutes,
+            rel=Rcalc_elapsed_minutes,
+            disposable=['time']
+            )
 
 for PV in PVs:
     sg.add_edge({'csv_data': valid_data,

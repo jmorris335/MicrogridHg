@@ -10,7 +10,7 @@ inputs = {
     start_year: 2025,
     start_hour: 15,
     has_random_failure: False,
-    time_step: 3600,
+    time_step: 60,
 }
 
 # Debugging options, also set logging_level to 12 or lower
@@ -30,7 +30,8 @@ if t is not None:
 else:
     print("No solutions found")
 
-# solve_and_plot(sg, [BATTERYs[0].supply], inputs, [43])
+nodes_to_solve = [PVs[0].state]
+# solve_and_plot(sg, nodes_to_solve, inputs, [43 for a in nodes_to_solve])
 
 # Solve for and plot actor states
-solve_and_plot_states(sg, inputs, 43)
+solve_and_plot_states(sg, inputs, 1000)
