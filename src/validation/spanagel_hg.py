@@ -36,7 +36,7 @@ BATTERYs = [
     Battery(
         name='BESS', 
         charge_capacity=18.,
-        charge_level=15, 
+        charge_level=13, 
         max_output=350.,
         charge_efficiency=0.85,
         max_charge_rate=10.,

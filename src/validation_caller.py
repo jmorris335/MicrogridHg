@@ -34,4 +34,3 @@ else:
 
 # Solve for and plot actor states
 solve_and_plot_states(sg, inputs, 43)
-#TODO: Need to investigate if `consider_lump_supply` is ruining PV output
