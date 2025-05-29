@@ -30,9 +30,7 @@ if t is not None:
 else:
     print("No solutions found")
 
-# t = sg.solve(state_vector, min_index=1000, inputs=inputs)
-# plot_time_values([battery1_is_deep_charging.label, BATTERYs[0].soc.label], t.values, 'time')
-# solve_and_plot(sg, nodes_to_solve, inputs, [20 for a in nodes_to_solve])
-
 # Solve for and plot actor states
-solve_and_plot_states(sg, inputs, 2500, search_depth=500000)
+# solve_and_plot_states(sg, inputs, 2500, search_depth=500000)
+
+plot_validation_study(sg, inputs, min_index=2500)

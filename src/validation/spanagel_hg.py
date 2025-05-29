@@ -18,14 +18,14 @@ sg = Hypergraph(no_weights=True)
 ## Nodes
 PVs = [
     PhotovoltaicArray(
-        name='PV1', 
+        name='Photovoltaic Array', 
         cost=0.001,
     )
 ]
 
 GENs = [
     Generator(
-        name='Generator1', 
+        name='Generator', 
         fuel_capacity=28., 
         starting_fuel_level=28., 
         max_output=6.2, 
@@ -35,17 +35,17 @@ GENs = [
 BATTERYs = [
     Battery(
         name='BESS', 
-        charge_capacity=18.,
-        charge_level=13, 
-        max_output=350.,
-        charge_efficiency=0.85,
-        max_charge_rate=10.,
+        charge_capacity=16.,
+        charge_level=14.4, 
+        max_output=5.2,
+        charge_efficiency=0.4,
+        max_charge_rate=4.16,
         trickle_prop=0.9,
     ),
 ]
 
 LOADs = [
-    Load(name='TestLoad',
+    Load(name='Test Load',
          benefit=100,
     ),
 ]

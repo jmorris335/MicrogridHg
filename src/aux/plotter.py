@@ -2,6 +2,7 @@
 import matplotlib.pyplot as plt
 import constrainthg as chg
 from collections import defaultdict
+from itertools import zip_longest
 
 plt.rcParams['font.family'] = 'times'
 
@@ -102,3 +103,62 @@ def solve_and_plot_states(mg: chg.Hypergraph, inputs: dict, min_index: int=8,
     outnames = [n for n in names if 'bus' not in n.lower()]
     plot_time_values(outnames, states, time, 
                      title='States of Grid Actors', ylabel='Power (kW)')
+    
+def plot_validation_study(sg: chg.Hypergraph, inputs: dict, min_index: int=2500,
+                           **kwargs):
+    """Solves the validation microgrid and plots the validation study."""
+    t = sg.solve('state_vector', inputs=inputs, min_index=min_index, 
+                 search_depth=500000, **kwargs)
+    fv = t.values
+    names = fv['names'][0]
+    csvdata = fv['validation_data']
+    times = [t / 3600 for t in fv['time']]
+    labels = ['BESS', 'Generator', 'Photovoltaic Array', 'Test Load']
+    # csv_tags = ['Battery Power (kW)', 'Generator power (kW)', 'Solar Power (kW)', 'Powerload (kW)']
+    csv_tags = ['Battery Power (kW)', 'Generator power (kW)']
+    csv_labels = ['BESS (measured)', 'Generator (measured)']
+    colors = ['#00bb55', '#8833bb', '#ddaa00', '#0055aa']
+    styles = ['-', '-', '--', '--']
+
+    states = defaultdict(list)
+    for sv in fv['state_vector']:
+        for state_value, name in zip(sv, names):
+            if name not in labels:
+                continue
+            states[name].append(state_value)
+
+    fig, ax = plt.subplots(figsize=(10,4))
+
+    csv_lines = []
+    for tag, color, label in zip(csv_tags, colors[:len(csv_tags)], csv_labels):
+        csvvalues = [float(d[tag]) for d in csvdata[0]]
+        csv_lines.append(ax.plot(times[:len(csvvalues)], csvvalues[:len(times)],
+                lw=5, color=color + '55', linestyle='-', label=label)[0])
+
+    chg_lines = []
+    for label, color, style in zip(labels, colors, styles):
+        values = states[label]
+        if label is labels[-1]:
+            values = [-a for a in values]
+        chg_lines.append(ax.plot(times[:len(values)], values[:len(times)],
+                lw=2, color=color, linestyle=style, label=label)[0])
+
+    ordered_lines = []
+    for pair in zip_longest(chg_lines, csv_lines):
+        ordered_lines.extend([val for val in pair if val is not None])
+
+    # Place legend
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0 + 0.2, box.width, box.height * 0.75])
+
+    plt.legend(handles=ordered_lines,
+               loc='lower center',
+               bbox_to_anchor=(0.5, -0.4),
+               ncols=len(labels),
+               frameon=False,
+    )
+
+    ax.set_ylabel('Power (kW)')
+    ax.set_xlabel('Time (hours)')
+    plt.title('Simluated Microgrid States vs. Measured Performance')
+    plt.show()
