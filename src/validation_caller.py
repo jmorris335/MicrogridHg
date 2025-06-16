@@ -18,17 +18,17 @@ debug_nodes = {'state_vector'} if False else None
 debug_edges = {'calc_battery_charge_level'} if True else None
 
 # Solve for a single node
-t = sg.solve(target=BATTERYs[0].soc,
-             inputs=inputs,
-             min_index=0, 
-             search_depth=100000, to_print=False,
-             debug_nodes=debug_nodes, debug_edges=debug_edges, 
-             logging_level=logging.INFO)
+# t = sg.solve(target=BATTERYs[0].soc,
+#              inputs=inputs,
+#              min_index=0, 
+#              search_depth=100000, to_print=False,
+#              debug_nodes=debug_nodes, debug_edges=debug_edges, 
+#              logging_level=logging.INFO)
 
-if t is not None:
-    print(t.value)
-else:
-    print("No solutions found")
+# if t is not None:
+#     print(t.value)
+# else:
+#     print("No solutions found")
 
 # Solve for and plot actor states
 # solve_and_plot_states(sg, inputs, 2500, search_depth=500000)

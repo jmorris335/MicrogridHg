@@ -5,6 +5,8 @@ from collections import defaultdict
 from itertools import zip_longest
 
 plt.rcParams['font.family'] = 'times'
+plt.rcParams['font.size'] = 14
+plt.rcParams['font.weight'] = 'bold'
 
 def solve_and_plot(hg: chg.Hypergraph, nodes: list, inputs: dict, indices: list=None):
     """Solves the graph for each of the nodes (at the given indices) and plots the results."""
@@ -153,12 +155,12 @@ def plot_validation_study(sg: chg.Hypergraph, inputs: dict, min_index: int=2500,
 
     plt.legend(handles=ordered_lines,
                loc='lower center',
-               bbox_to_anchor=(0.5, -0.4),
+               bbox_to_anchor=(0.5, -0.2),
                ncols=len(labels),
                frameon=False,
     )
 
     ax.set_ylabel('Power (kW)')
     ax.set_xlabel('Time (hours)')
-    plt.title('Simluated Microgrid States vs. Measured Performance')
+    # plt.title('Simluated Microgrid States vs. Measured Performance')
     plt.show()

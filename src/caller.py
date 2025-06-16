@@ -9,7 +9,7 @@ inputs = {
     start_year: 2004,
     start_hour: 12,
     has_random_failure: False,
-    island_mode: True,
+    island_mode: False,
     time_step: 3600,
 }
 
