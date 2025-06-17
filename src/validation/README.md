@@ -14,4 +14,6 @@ from the more general constraint hypergraph given in `microgrid.py`.
 Running the `validation_caller.py` script from the `src` directory allows you to 
 query the Spanagel digital twin. The main plot should look something like this:
 
-![Validation of Microgrid](./media/validation_study.png)
+<h2 align="center">
+<img src="https://github.com/jmorris335/MicrogridHg/blob/421d0f69edf06eab1c873b4258261d1613d04c0f/media/validation_study.png" width="500">
+</h2>

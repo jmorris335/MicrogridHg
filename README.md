@@ -110,3 +110,10 @@ method (documentation
  the microgrid, must cycles relate to hour-long timestepping, so to find
  the state of a battery after 14 hours you might pass `min_index=15` to
   the `solve` method.
+
+Running the full simulation over a week should give you a plot similar to this, 
+with the top in islanded mode (utiltiy grid not connected):
+
+<h3 align="center">
+<img src="https://github.com/jmorris335/MicrogridHg/blob/421d0f69edf06eab1c873b4258261d1613d04c0f/media/microgrid-run.png" width="500">
+</h3>
