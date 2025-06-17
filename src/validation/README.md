@@ -1,3 +1,5 @@
+# Validation Study of Microgrid
+
 The microgrid is a general purpose model, it was validated by incorporating 
 information from an experimental microgrid setup and run in Monterey, California
 at the Naval Postgraduate School by [Richard Alves](https://orcid.org/0009-0003-4150-5961)
