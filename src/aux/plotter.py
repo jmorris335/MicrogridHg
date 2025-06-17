@@ -106,6 +106,73 @@ def solve_and_plot_states(mg: chg.Hypergraph, inputs: dict, min_index: int=8,
     plot_time_values(outnames, states, time, 
                      title='States of Grid Actors', ylabel='Power (kW)')
     
+def plot_general_study(mg: chg.Hypergraph, **inputs: dict):
+    """Solves the microgrid and plots the states over a 168 hour period 
+    (roughly one week)."""
+
+    fig, axs = plt.subplots(2,1, figsize=(10,4))
+
+    default_inputs = {
+        'start_day': 100,
+        'start_year': 2005,
+        'start_hour': 6,
+        'use_random_date': False,
+        'has_random_failure': False,
+        'island_mode': True,
+        'time_step': 3600,
+    }
+    inputs.update(**default_inputs)
+
+    plot_data = [
+        ('Battery1', 'BESS', '#00bb55', '-'),
+        ('Building5Warehouse', 'Warehouse', '#002266', '-'),
+        ('Building1Small', 'Small Building (1)', '#0055aa', '--'),
+        ('Building2Small', 'Small Building (2)', '#0055aa', '-.'),
+        ('Building3Medium', 'Medium Building', '#0055aa', ':'),
+        ('Building4Large', 'Large Building', '#0055aa', '-'),
+        ('Generator1', 'Generator (1)', '#8833bb', '-'),
+        ('Generator2', 'Generator (2)', '#8833bb', '--'),
+        ('PV1', 'Photovoltaic Array', '#ddaa00', '-'),
+    ]
+
+    for ax in axs:
+        mg.reset()
+        if not inputs['island_mode']:
+            plot_data.append(('UtilityGrid', 'Utility Grid', '#ff5555', '-'))
+
+        t = mg.solve('state_vector', inputs=inputs, min_index=168)
+        fv = t.values
+        times = [t/3600 for t in fv['time']]
+        names = fv['names'][0]
+
+        states = {}
+        for actor_tuple in plot_data:
+            name = actor_tuple[0]
+            values = [sv[names.index(name)] for sv in fv['state_vector']]
+            states[name] = values
+
+        lines = []
+        for name, label, color, dash in plot_data:
+            values = states[name]
+            lines.append(ax.plot(times[:len(values)], values[:len(times)],
+                        lw=2, label=label, color=color, linestyle=dash)[0])
+            
+        
+        ax.set_ylabel('Power (kW)')
+        inputs['island_mode'] = False
+
+    axs[-1].legend(handles=lines,
+               loc='lower center',
+               bbox_to_anchor=(0.5, -0.4),
+               ncols=5,
+               frameon=False,
+    )
+
+    axs[-1].set_xlabel('Time (hours)')
+    plt.show()
+
+
+    
 def plot_validation_study(sg: chg.Hypergraph, inputs: dict, min_index: int=2500,
                            **kwargs):
     """Solves the validation microgrid and plots the validation study."""

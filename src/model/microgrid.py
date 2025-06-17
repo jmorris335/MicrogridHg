@@ -16,7 +16,7 @@ UGs = [
         name='UtilityGrid', 
         is_load_shedding=False,
         benefit=0.4,
-        cost=0.13,
+        cost=0.07,
         req_demand=0.,
         max_demand=120.,
         supply=20000.,
@@ -51,27 +51,28 @@ WINDs = [
 GENs = [
     Generator(
         name='Generator1', 
-        fuel_capacity=28., 
-        starting_fuel_level=28., 
-        max_output=7., 
-    ), 
-    Generator(
-        name='Generator2', 
         fuel_capacity=2500., 
         starting_fuel_level=2500., 
         max_output=100., 
     ), 
+    Generator(
+        name='Generator2', 
+        fuel_capacity=280., 
+        starting_fuel_level=280., 
+        max_output=70., 
+    ), 
+
 ]
 
 BATTERYs = [
     Battery(
         name='Battery1', 
-        charge_capacity=10000.,
-        charge_level=10000., 
-        max_output=500.,
+        charge_capacity=15000.,
+        charge_level=15000., 
+        max_output=2000.,
         charge_efficiency=0.95,
-        max_charge_rate=500.,
-        scarcity_factor=1.5,
+        max_charge_rate=800.,
+        scarcity_factor=0.2,
         trickle_prop=0.8,
     ),
 ]
@@ -194,10 +195,10 @@ elapsed_hours = Node('elapsed_hours',
     description='number of hours that have passed during the simulation')
 elapsed_minutes = Node('elapsed_minutes', 0,
     description='number of minutes that have passed during the simulation')
-start_year = Node('start year', description='starting year for the simulation')
-start_day = Node('start day', 
+start_year = Node('start_year', description='starting year for the simulation')
+start_day = Node('start_day', 
     description='starting day for the simulation (1-366)')
-start_hour = Node('start hour', 1, 
+start_hour = Node('start_hour', 1, 
     description='starting hour for the simulation (1-24)')
 year = Node('year', description='current year')
 day = Node('day', description='current day of the year (1-366)')
@@ -234,7 +235,7 @@ load_filename = Node('load filename',
     description='filename for load information')
 batt_trickle = Node('battery trickle charge rate prop', 0.25, 
     description='proportion of maximum charging rate to reduce batteries to after 80% charged')
-cost_of_diesel = Node('cost of diesel', 1.92,
+cost_of_diesel = Node('cost of diesel', 3.50,
     description='cost of diesel fuel',
     units='$/L')
 next_refuel_hour = Node('next refuel hour', 0, 
@@ -566,7 +567,7 @@ for W in WINDs:
     
 ### Loads
 for L in LOADs + BUILDINGs:
-    mg.add_edge(L.req_demand, L.max_demand, R.Rfirst)
+    mg.add_edge(L.normal_load, L.max_demand, R.Rfirst)
 
     #TODO: Need to implement a way for the critical load to be passed as well.
     mg.add_edge({'conn': L.is_connected, 
@@ -732,7 +733,8 @@ for B in BATTERYs:
                  'max_rate': B.max_charge_rate,
                  'trickle_prop': B.trickle_prop,
                  'trickle_rate': batt_trickle,
-                 'time_step': time_step}, 
+                 'time_step': time_step,
+                 'seconds_in_hour': seconds_in_hour}, 
                 target=B.max_demand, 
                 disposable=['level'],
                 rel=Rcalc_battery_max_demand,

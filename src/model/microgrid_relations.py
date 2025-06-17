@@ -323,7 +323,7 @@ def Rcalc_battery_cost(ug_cost: float, tol: float, level: float, capacity: float
     level_factor = (1 - level / capacity) * factor
     cost = ug_cost + (ug_cost * level_factor)
     if is_charging:
-        cost * 2.5
+        cost *= 1.1
     return cost
 
 def Rcalc_battery_benefit(ug_cost: float, level: float, capacity:float, factor: float,
@@ -337,14 +337,17 @@ def Rcalc_battery_benefit(ug_cost: float, level: float, capacity:float, factor: 
 
 def Rcalc_battery_max_demand(level: float, capacity: float, max_rate: float, 
                              trickle_prop: float, trickle_rate: float, 
-                             time_step: float, **kwargs)-> float:
+                             time_step: float, seconds_in_hour: int, 
+                             **kwargs)-> float:
     """Calculates the maximum power the battery can receive."""
+    time_step = time_step / seconds_in_hour
     if level > trickle_prop * capacity:
         demand = trickle_rate * max_rate * time_step
     else:
         demand = max_rate * time_step
     demand = abs(demand)
-    demand = max(demand, capacity - level)
+    space = (capacity - level) / time_step
+    demand = min(demand, space)
     return demand
 
 
