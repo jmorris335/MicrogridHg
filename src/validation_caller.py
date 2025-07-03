@@ -18,10 +18,11 @@ debug_nodes = {'state_vector'} if False else None
 debug_edges = {'calc_battery_charge_level'} if True else None
 
 # Solve for a single node
-t = sg.solve(target=BATTERYs[0].soc,
+t = sg.solve(target=state_vector,
              inputs=inputs,
-             min_index=0, 
-             search_depth=100000, to_print=False,
+             min_index=25, 
+             search_depth=100000,
+             to_print=False,
              debug_nodes=debug_nodes, debug_edges=debug_edges, 
              logging_level=logging.INFO)
 
@@ -30,4 +31,4 @@ if t is not None:
 else:
     print("No solutions found")
 
-# plot_validation_study(sg, inputs, min_index=2500)
+plot_validation_study(sg, inputs, min_index=2500)

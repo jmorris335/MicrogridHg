@@ -68,11 +68,11 @@ for SRC in ACTORS:
     SRC.add_source(BUSs[0], True)
 
 ### Other nodes
-valid_data_path = Node('validation_data_path')
+valid_data_path = Node('valid_data_path')
 valid_data = Node('validation_data')
 time_column = Node('time_data_column', 1)
-pv_power_label = Node('pv_power_label', 'Solar Power (kW)')
-load_label = Node('node_label', 'Powerload (kW)')
+pv_power_label = Node('pv_power_label', 'Solar Power')
+load_label = Node('node_label', 'Powerload')
 battery1_is_deep_charging = Node('battery1_is_deep_charging', False,
     description='True if battery is going through a full recharge')
 
@@ -707,7 +707,8 @@ for B in BATTERYs:
                  'max_rate': B.max_charge_rate,
                  'trickle_prop': B.trickle_prop,
                  'trickle_rate': batt_trickle,
-                 'time_step': time_step}, 
+                 'time_step': time_step,
+                 'seconds_in_hour': seconds_in_hour}, 
                 target=B.max_demand, 
                 disposable=['level'],
                 rel=Rcalc_battery_max_demand,

@@ -18,16 +18,14 @@ debug_nodes = {'state_vector'} if False else None
 debug_edges = {'make_state_vector'} if False else None
 
 # Solve for a single node
-t = mg.solve(target=PVs[0].state,
+t = mg.solve(target=state_vector,
              inputs=inputs,
-             min_index=5, 
+             min_index=1, 
              search_depth=5000,
-             to_print=False,
+             to_print=True,
              debug_nodes=debug_nodes, debug_edges=debug_edges, 
              logging_level=logging.INFO)
 if t is not None:
     print(t.value)
 else:
     print("No solutions found")
-
-# plot_general_study(mg)
