@@ -61,7 +61,6 @@ GENs = [
         starting_fuel_level=280., 
         max_output=70., 
     ), 
-
 ]
 
 BATTERYs = [

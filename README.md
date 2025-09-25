@@ -10,7 +10,7 @@ This model describes the behavior of a microgrid, formalized in a constraint hyp
 </h1>
 
 ## Running the Code
-The simulation and resulting figures in the Nature articles can be run by executing the `src/nature_caller.py` module. A general purpose caller is found at `src/caller.py`, while the validation study is normally called from `src/validation_caller.py`.
+The simulation and resulting figures in the DT articles can be run by executing the `src/general_caller.py` module. A general purpose caller is found at `src/caller.py`, while the validation study is normally called from `src/validation_caller.py`.
 
 ## Files:
 - `model/microgrid.py`: The main model, as well as the caller for the simulation. Described in detail below in [Usage](#usage).

@@ -2,7 +2,7 @@ from model.microgrid import mg as general_hg
 from validation.spanagel_hg import sg as spanagel_hg
 from aux.plotter import *
 
-# Note that the simulation is not fast, please be patient.
+# Note that the simulation may be on the order of tens of seconds, please be patient.
 
 inputs = {
     'use_random_date': False,

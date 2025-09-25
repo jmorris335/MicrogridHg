@@ -15,7 +15,7 @@ inputs = {
 
 # Debugging options, also set logging_level to 12 or lower
 debug_nodes = {'state_vector'} if False else None
-debug_edges = {'calc_battery_charge_level'} if True else None
+debug_edges = {'calc_battery_charge_level'} if False else None
 
 # Solve for a single node
 t = sg.solve(target=state_vector,
